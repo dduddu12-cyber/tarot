@@ -1,0 +1,2882 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>타로 리딩</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:    #0b0820;
+  --pur:   #6c3fc5;
+  --pur-l: #9b6ef3;
+  --gold:  #f0c040;
+  --gld-l: #fde87a;
+  --gld-d: #b8860b;
+  --text:  #e8dff5;
+  --dim:   #a090c0;
+  --r:     10px;
+  --rose:  #e07070;
+}
+
+body {
+  min-height: 100vh;
+  background: radial-gradient(ellipse at 50% 0%, #1e1060 0%, var(--bg) 70%);
+  color: var(--text);
+  font-family: 'Segoe UI', 'Apple SD Gothic Neo', sans-serif;
+  overflow-x: hidden;
+}
+
+/* 별 */
+.stars { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+.stars span {
+  position: absolute; border-radius: 50%; background: #fff;
+  animation: twinkle var(--d,3s) ease-in-out infinite alternate;
+  opacity: var(--o,.6);
+}
+@keyframes twinkle {
+  from { opacity: calc(var(--o,.6)*.3); transform: scale(.8); }
+  to   { opacity: var(--o,.6); transform: scale(1.2); }
+}
+
+/* 달 */
+.moon {
+  position: fixed; top: 20px; right: 24px;
+  width: 54px; height: 54px; border-radius: 50%; z-index: 1;
+  background: radial-gradient(circle at 35% 35%, var(--gld-l), var(--gld-d));
+  box-shadow: 0 0 30px rgba(240,192,64,.5);
+  animation: moonGlow 4s ease-in-out infinite alternate;
+}
+@keyframes moonGlow {
+  from { box-shadow: 0 0 20px rgba(240,192,64,.4); }
+  to   { box-shadow: 0 0 40px rgba(240,192,64,.7), 0 0 80px rgba(240,192,64,.3); }
+}
+
+/* 레이아웃 */
+.wrap { position: relative; z-index: 2; max-width: 700px; margin: 0 auto; padding: 20px 14px 60px; }
+
+/* 헤더 */
+header { text-align: center; margin-bottom: 24px; padding-top: 10px; }
+header h1 {
+  font-size: clamp(1.5rem, 5vw, 2rem); font-weight: 700; margin-bottom: 4px;
+  background: linear-gradient(135deg, var(--gld-l), var(--gold), var(--pur-l));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+header .cat-badge {
+  display: inline-block; font-size: .72rem; padding: 3px 14px;
+  border: 1px solid rgba(240,192,64,.4); border-radius: 20px;
+  color: var(--gold); letter-spacing: .1em; margin-bottom: 6px;
+}
+header p { font-size: .72rem; letter-spacing: .22em; color: var(--gld-d); text-transform: uppercase; }
+
+/* 스크린 전환 */
+.screen { display: none; }
+.screen.active { display: block; }
+
+/* ─── 설정 화면 ─── */
+.card-box {
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(155,110,243,.25);
+  border-radius: var(--r); padding: 20px; margin-bottom: 16px;
+  backdrop-filter: blur(6px);
+}
+.card-box.active-box { border-color: rgba(155,110,243,.6); box-shadow: 0 0 18px rgba(155,110,243,.4); }
+.box-label {
+  font-size: .68rem; letter-spacing: .22em; text-transform: uppercase;
+  color: var(--gold); margin-bottom: 10px; display: flex; align-items: center; gap: 8px;
+}
+.box-num {
+  width: 20px; height: 20px; border-radius: 50%; font-size: .62rem; font-weight: 700;
+  background: linear-gradient(135deg, var(--pur), var(--pur-l));
+  display: flex; align-items: center; justify-content: center; color: #fff; flex-shrink: 0;
+}
+.box-title { font-size: .98rem; font-weight: 600; margin-bottom: 14px; }
+
+/* textarea */
+.worry-ta {
+  width: 100%; min-height: 100px;
+  background: rgba(255,255,255,.05); border: 1px solid rgba(155,110,243,.3);
+  border-radius: 8px; padding: 12px 14px; color: var(--text);
+  font-size: .92rem; line-height: 1.6; resize: vertical; outline: none;
+  font-family: inherit; transition: border-color .2s;
+}
+.worry-ta::placeholder { color: var(--dim); }
+.worry-ta:focus { border-color: var(--pur-l); box-shadow: 0 0 10px rgba(155,110,243,.25); }
+.char-count { text-align: right; font-size: .7rem; color: var(--dim); margin-top: 4px; }
+
+/* 토글 버튼 그룹 */
+.toggle-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.toggle-btn {
+  background: rgba(255,255,255,.05); border: 1px solid rgba(155,110,243,.3);
+  border-radius: var(--r); padding: 14px 10px; cursor: pointer;
+  color: var(--text); text-align: center; transition: all .22s;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  font-family: inherit;
+}
+.toggle-btn:hover { background: rgba(108,63,197,.2); border-color: var(--pur-l); transform: translateY(-2px); }
+.toggle-btn.sel {
+  background: linear-gradient(135deg, rgba(108,63,197,.5), rgba(155,110,243,.3));
+  border-color: var(--gold); box-shadow: 0 0 14px rgba(240,192,64,.22);
+}
+.toggle-btn .t-icon { font-size: 1.4rem; line-height: 1; }
+.toggle-btn .t-name { font-size: .88rem; font-weight: 700; }
+.toggle-btn .t-desc { font-size: .68rem; color: var(--dim); line-height: 1.4; }
+.toggle-btn.sel .t-desc { color: var(--gld-l); }
+
+/* 사주 필드 */
+.saju-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.saju-full { grid-column: 1/-1; }
+.saju-label { font-size: .7rem; color: var(--gold); letter-spacing: .08em; margin-bottom: 5px; display: block; }
+.saju-inp {
+  width: 100%; background: rgba(255,255,255,.06);
+  border: 1px solid rgba(155,110,243,.35); border-radius: 8px;
+  padding: 9px 11px; color: var(--text); font-size: .86rem;
+  outline: none; font-family: inherit; appearance: none;
+  transition: border-color .2s;
+}
+.saju-inp:focus { border-color: var(--pur-l); }
+.saju-inp::placeholder { color: var(--dim); }
+.saju-inp option { background: #1a0a2e; }
+.saju-inp.rose { border-color: rgba(224,112,112,.35); }
+.saju-inp.rose:focus { border-color: var(--rose); }
+.gender-row { display: flex; gap: 8px; }
+.gender-btn {
+  flex: 1; padding: 9px; background: rgba(255,255,255,.04);
+  border: 1px solid rgba(155,110,243,.3); border-radius: 8px;
+  color: var(--dim); font-size: .88rem; font-weight: 600;
+  cursor: pointer; transition: all .2s; font-family: inherit;
+}
+.gender-btn:hover { background: rgba(108,63,197,.15); border-color: var(--pur-l); }
+.gender-btn.sel { background: rgba(108,63,197,.3); border-color: var(--pur-l); color: var(--pur-l); }
+
+/* 궁합 인물 박스 */
+.person-box {
+  background: rgba(255,255,255,.03); border: 1px solid rgba(155,110,243,.2);
+  border-radius: 8px; padding: 14px; margin-bottom: 12px;
+}
+.person-box:last-child { margin-bottom: 0; }
+.person-title {
+  font-size: .82rem; font-weight: 700; color: var(--pur-l); letter-spacing: .06em;
+  margin-bottom: 4px; display: flex; align-items: center; gap: 6px;
+}
+.person-title span { font-size: 1rem; }
+.person-box .saju-inp { border-color: rgba(155,110,243,.3); }
+.person-box .saju-inp:focus { border-color: var(--pur-l); }
+.person-box .gender-btn { border-color: rgba(155,110,243,.25); }
+
+/* API 키 */
+.api-row { display: flex; gap: 8px; margin-top: 10px; }
+.api-inp {
+  flex: 1; background: rgba(255,255,255,.06); border: 1px solid rgba(155,110,243,.3);
+  border-radius: 8px; padding: 9px 12px; color: var(--text);
+  font-size: .8rem; font-family: monospace; outline: none; transition: border-color .2s;
+}
+.api-inp:focus { border-color: var(--pur-l); }
+.api-inp::placeholder { color: var(--dim); font-family: inherit; }
+.api-save-btn {
+  background: rgba(108,63,197,.3); border: 1px solid var(--pur-l);
+  border-radius: 8px; padding: 9px 14px; color: var(--pur-l);
+  font-size: .8rem; font-weight: 600; cursor: pointer; white-space: nowrap;
+  transition: all .2s; font-family: inherit;
+}
+.api-save-btn:hover { background: rgba(108,63,197,.5); color: #fff; }
+.api-status { font-size: .72rem; margin-top: 6px; min-height: 1em; }
+.api-status.ok  { color: #7dd87d; }
+.api-status.err { color: #f08080; }
+
+/* 시작 버튼 */
+.start-btn {
+  display: block; width: 100%; margin-top: 8px; padding: 16px;
+  background: linear-gradient(135deg, var(--pur), #4a2a9a, var(--pur));
+  background-size: 200% auto; border: 1px solid var(--gold); border-radius: var(--r);
+  color: var(--gld-l); font-size: .95rem; font-weight: 700; letter-spacing: .08em;
+  cursor: pointer; font-family: inherit; transition: all .3s;
+  box-shadow: 0 4px 20px rgba(108,63,197,.4);
+}
+.start-btn:hover:not(:disabled) { background-position: right center; transform: translateY(-2px); box-shadow: 0 6px 28px rgba(240,192,64,.3); }
+.start-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+/* ─── 카드 선택 화면 ─── */
+.progress-bar { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 18px; }
+.prog-count { font-size: .88rem; font-weight: 700; color: var(--gold); background: rgba(240,192,64,.1); border: 1px solid rgba(240,192,64,.3); border-radius: 20px; padding: 4px 14px; }
+.prog-dots { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.prog-dot { width: 10px; height: 10px; border-radius: 50%; border: 1px solid rgba(155,110,243,.5); background: rgba(255,255,255,.05); transition: all .3s; }
+.prog-dot.done { background: var(--gold); border-color: var(--gold); box-shadow: 0 0 8px rgba(240,192,64,.5); }
+
+.hint { text-align: center; font-size: .82rem; color: var(--gold); letter-spacing: .08em; margin-bottom: 14px; animation: pulse 2s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:.6} 50%{opacity:1} }
+
+/* 슬롯 */
+.slot-group { margin-bottom: 8px; }
+.slot-group-label {
+  font-size: .66rem; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--pur-l); margin-bottom: 6px; padding-left: 2px;
+}
+.slot-labels { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 4px; }
+.slot-label-text { width: 68px; text-align: center; font-size: .56rem; color: var(--gld-d); letter-spacing: .04em; }
+.selected-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 18px; }
+.sel-slot {
+  width: 68px; aspect-ratio: 2/3.5;
+  border: 2px dashed rgba(155,110,243,.4); border-radius: 8px; overflow: hidden;
+  background: rgba(255,255,255,.03);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: var(--dim); font-size: .58rem; text-align: center; transition: all .3s;
+}
+.sel-slot.filled { border: 2px solid var(--gold); border-style: solid; box-shadow: 0 0 10px rgba(240,192,64,.2); }
+.sel-slot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* 카드 모드 선택 */
+.mode-select-row {
+  display: flex; gap: 10px; margin-bottom: 10px;
+}
+.mode-select-btn {
+  flex: 1; padding: 12px 10px; border-radius: var(--r);
+  background: rgba(255,255,255,.04); border: 2px solid rgba(155,110,243,.2);
+  color: var(--dim); cursor: pointer; font-family: inherit;
+  transition: all .22s; display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.mode-select-btn:hover { background: rgba(108,63,197,.15); border-color: var(--pur-l); color: var(--text); }
+.mode-select-btn.active {
+  background: linear-gradient(135deg, rgba(108,63,197,.4), rgba(200,160,40,.1));
+  border-color: var(--gold); color: var(--gld-l);
+}
+.msb-icon  { font-size: 1.6rem; line-height: 1; }
+.msb-title { font-size: .9rem; font-weight: 700; }
+.msb-desc  { font-size: .68rem; color: inherit; opacity: .75; }
+.mode-select-btn.active .msb-desc { opacity: .9; }
+
+/* 모드 뱃지 */
+.mode-badge-row { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.mode-badge {
+  font-size: .72rem; font-weight: 700; letter-spacing: .06em;
+  padding: 3px 10px; border-radius: 20px;
+  background: rgba(108,63,197,.25); border: 1px solid rgba(155,110,243,.4); color: var(--pur-l);
+}
+.mode-badge.real { background: rgba(200,160,40,.15); border-color: var(--gold); color: var(--gld-l); }
+
+/* 실물카드 검색 */
+.real-card-area { display: none; }
+.search-inp {
+  width: 100%; background: rgba(255,255,255,.06); border: 1px solid rgba(155,110,243,.35);
+  border-radius: 8px; padding: 11px 14px; color: var(--text); font-size: .92rem;
+  outline: none; font-family: inherit; transition: border-color .2s; margin-bottom: 10px;
+}
+.search-inp:focus { border-color: var(--pur-l); box-shadow: 0 0 10px rgba(155,110,243,.25); }
+.search-inp::placeholder { color: var(--dim); }
+.search-results {
+  display: flex; flex-direction: column; gap: 6px;
+  max-height: 380px; overflow-y: auto;
+  scrollbar-width: thin; scrollbar-color: var(--pur) transparent;
+}
+.search-results::-webkit-scrollbar { width: 4px; }
+.search-results::-webkit-scrollbar-thumb { background: var(--pur); border-radius: 2px; }
+.search-item {
+  display: flex; align-items: center; gap: 12px;
+  background: rgba(255,255,255,.04); border: 1px solid rgba(155,110,243,.2);
+  border-radius: 8px; padding: 8px 12px; cursor: pointer; transition: all .2s;
+}
+.search-item:hover { background: rgba(108,63,197,.2); border-color: var(--pur-l); }
+.search-item.used { opacity: .35; cursor: not-allowed; pointer-events: none; }
+.search-thumb { width: 32px; height: 56px; border-radius: 4px; object-fit: cover; flex-shrink: 0; }
+.search-info { flex: 1; min-width: 0; }
+.search-name { font-size: .88rem; font-weight: 600; color: var(--text); }
+.search-en   { font-size: .72rem; color: var(--dim); margin-top: 2px; }
+.search-empty { text-align: center; padding: 24px; color: var(--dim); font-size: .84rem; }
+
+/* ─── 카테고리 선택 화면 ─── */
+.cat-sel-intro { text-align: center; margin-bottom: 28px; }
+.cat-sel-intro p { font-size: .88rem; color: var(--dim); line-height: 1.7; }
+.cat-sel-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px;
+}
+@media (min-width: 480px) { .cat-sel-grid { grid-template-columns: 1fr 1fr 1fr 1fr; } }
+.cat-sel-card {
+  background: rgba(255,255,255,.04); border: 1px solid rgba(155,110,243,.25);
+  border-radius: var(--r); padding: 18px 10px; cursor: pointer; text-align: center;
+  transition: all .25s; font-family: inherit;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+.cat-sel-card:hover {
+  background: rgba(108,63,197,.25); border-color: var(--gold);
+  transform: translateY(-4px); box-shadow: 0 8px 24px rgba(108,63,197,.35);
+}
+.cat-sel-icon { font-size: 2rem; line-height: 1; }
+.cat-sel-name { font-size: .88rem; font-weight: 700; color: var(--text); }
+.cat-sel-desc { font-size: .68rem; color: var(--dim); line-height: 1.4; }
+
+/* 카드 그리드 */
+.fan-container {
+  display: grid;
+  grid-template-columns: repeat(13, 1fr);
+  gap: 3px;
+  padding: 4px;
+  margin-top: 8px;
+  margin-bottom: 14px;
+  border-radius: 8px;
+  background: rgba(255,255,255,.02);
+}
+.fan-card {
+  position: relative;
+  aspect-ratio: 2/3;
+  cursor: pointer;
+  border-radius: 4px;
+  overflow: hidden;
+  perspective: 600px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.fan-card:not(.picked):hover {
+  transform: scale(1.18) translateY(-2px);
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(240,192,64,.55);
+}
+.fan-card.picked { opacity: .28; cursor: default; pointer-events: none; }
+.fan-card.gathering {
+  transform: scale(0.5) !important;
+  opacity: 0 !important;
+  transition: all 0.3s cubic-bezier(.4,0,.2,1) !important;
+}
+
+/* 카드 */
+.card-inner { position: absolute; inset: 0; transform-style: preserve-3d; transition: transform .55s cubic-bezier(.4,0,.2,1); }
+.fan-card.flipped .card-inner { transform: rotateY(180deg); }
+.card-face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: 8px; overflow: hidden; }
+
+/* 카드 뒷면: 순수 CSS */
+.card-back {
+  background: #1a1a4e;
+  border: 2px solid rgba(200,160,40,.6);
+  display: flex; align-items: center; justify-content: center; position: relative;
+}
+.card-back::before {
+  content: '';
+  position: absolute; inset: 5px;
+  border: 1px solid rgba(200,160,40,.35);
+  border-radius: 4px;
+}
+.card-back::after {
+  content: '✦';
+  font-size: 1.6rem;
+  color: #c8a028;
+  text-shadow: 0 0 10px rgba(200,160,40,.7), 0 0 20px rgba(200,160,40,.3);
+}
+
+/* 카드 앞면: 이미지 */
+.card-front {
+  transform: rotateY(180deg);
+  background: linear-gradient(160deg, #1a0f40, #2a1a60);
+  border: 1px solid rgba(155,110,243,.5);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 0; overflow: hidden;
+}
+.card-front img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* 이미지 로드 실패시 텍스트 폴백 */
+.card-front-fallback {
+  display: none; width: 100%; height: 100%;
+  flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; padding: 6px; gap: 4px;
+}
+.card-front-name { font-size: .72rem; font-weight: 700; color: var(--gld-l); line-height: 1.4; }
+.card-front-en   { font-size: .55rem; color: var(--dim); line-height: 1.3; }
+
+.fan-card:not(.picked):hover .card-back { border-color: var(--gold); box-shadow: 0 0 16px rgba(240,192,64,.6); }
+
+.next-btn {
+  display: block; width: 100%; margin-top: 18px; padding: 15px;
+  background: linear-gradient(135deg, var(--pur), #4a2a9a, var(--pur)); background-size: 200% auto;
+  border: 1px solid var(--gold); border-radius: var(--r);
+  color: var(--gld-l); font-size: .92rem; font-weight: 700; letter-spacing: .08em;
+  cursor: pointer; font-family: inherit; transition: all .3s;
+  box-shadow: 0 4px 20px rgba(108,63,197,.4);
+  opacity: 0; pointer-events: none; transform: translateY(6px);
+}
+.next-btn.ready { opacity: 1; pointer-events: auto; transform: translateY(0); }
+.next-btn:hover { background-position: right center; transform: translateY(-2px); }
+
+.reset-btn { display: block; width: 100%; margin-top: 10px; padding: 11px; background: transparent; border: 1px solid rgba(155,110,243,.3); border-radius: var(--r); color: var(--dim); font-size: .84rem; cursor: pointer; transition: all .25s; font-family: inherit; }
+.reset-btn:hover { border-color: var(--pur-l); color: var(--text); background: rgba(108,63,197,.12); }
+
+/* ─── 로딩 화면 ─── */
+.loading-wrap { text-align: center; padding: 60px 20px; }
+.loading-orbit { position: relative; width: 100px; height: 100px; margin: 0 auto 24px; }
+.loading-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 2rem; color: var(--gold); animation: lPulse 1.8s ease-in-out infinite; }
+@keyframes lPulse { 0%,100%{opacity:.7;transform:translate(-50%,-50%) scale(.95)} 50%{opacity:1;transform:translate(-50%,-50%) scale(1.1)} }
+.orbit-star { position: absolute; top: 50%; left: 50%; font-size: .9rem; color: var(--pur-l); transform-origin: 0 0; animation: oSpin var(--dur,3s) linear infinite var(--dl,0s); }
+.orbit-star:nth-child(even) { color: var(--gold); font-size: .7rem; }
+@keyframes oSpin { from{transform:rotate(0deg) translateX(var(--r,44px)) rotate(0deg)} to{transform:rotate(360deg) translateX(var(--r,44px)) rotate(-360deg)} }
+.loading-title { font-size: 1.05rem; font-weight: 600; color: var(--gld-l); margin-bottom: 10px; }
+.loading-dots span { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--pur-l); margin: 0 3px; animation: dBounce 1.2s ease-in-out infinite; }
+.loading-dots span:nth-child(2){animation-delay:.2s} .loading-dots span:nth-child(3){animation-delay:.4s}
+@keyframes dBounce { 0%,80%,100%{transform:translateY(0);opacity:.4} 40%{transform:translateY(-8px);opacity:1} }
+.loading-msg { font-size: .8rem; color: var(--dim); margin-top: 12px; animation: fadeIO 2.5s ease-in-out infinite; }
+@keyframes fadeIO { 0%,100%{opacity:.3} 50%{opacity:1} }
+
+/* ─── 결과 화면 ─── */
+#screen-result {
+  max-width: 600px;
+  margin: 0 auto;
+  background: rgba(8,5,24,.82);
+  border-radius: 16px;
+  padding: 24px 20px 32px;
+  backdrop-filter: blur(6px);
+}
+.result-header { text-align: center; margin-bottom: 20px; }
+.result-header h2 { font-size: 1.25rem; font-weight: 700; color: var(--gld-l); margin-bottom: 6px; }
+.result-worry { font-size: .88rem; color: var(--dim); font-style: italic; line-height: 1.6; }
+
+/* 결과 카드 그룹 */
+.result-group { margin-bottom: 16px; }
+.result-group-title {
+  font-size: .72rem; letter-spacing: .15em; text-transform: uppercase;
+  color: var(--pur-l); border-bottom: 1px solid rgba(155,110,243,.25);
+  padding-bottom: 6px; margin-bottom: 10px;
+}
+.result-cards-row { display: flex; gap: 8px; justify-content: center; flex-wrap: nowrap; padding: 10px 0 18px; }
+.result-card-item { display: flex; flex-direction: column; align-items: center; gap: 5px; flex: 1; min-width: 0; max-width: 18%; }
+.result-card-img {
+  width: 100%; aspect-ratio: 2/3.5;
+  border: 1px solid rgba(155,110,243,.5); border-radius: 6px; overflow: hidden;
+  box-shadow: 0 4px 14px rgba(0,0,0,.5);
+  transition: transform .2s;
+}
+.result-card-img:hover { transform: translateY(-4px) scale(1.05); }
+.result-card-img.rev { transform: rotate(180deg); }
+.result-card-img.rev:hover { transform: rotate(180deg) translateY(4px) scale(1.05); }
+.result-card-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.result-card-pos { font-size: .52rem; color: var(--gold); text-align: center; line-height: 1.3; word-break: keep-all; }
+.result-card-name { font-size: .58rem; color: var(--dim); text-align: center; }
+.result-dir-badge { font-size: .54rem; padding: 1px 6px; border-radius: 20px; font-weight: 600; }
+.result-dir-badge.up  { background: rgba(108,63,197,.3); border: 1px solid var(--pur-l); color: var(--pur-l); }
+.result-dir-badge.rev { background: rgba(180,80,80,.2);  border: 1px solid #e07070; color: #e07070; }
+
+/* AI 리딩 블록 */
+.ai-wrap { margin-bottom: 20px; }
+.ai-block {
+  background: rgba(255,255,255,.05); border: 1px solid rgba(155,110,243,.22);
+  padding: 20px 18px; margin-bottom: 0; border-bottom: none;
+}
+.ai-block:first-child { border-radius: var(--r) var(--r) 0 0; }
+.ai-block:last-child  { border-radius: 0 0 var(--r) var(--r); border-bottom: 1px solid rgba(155,110,243,.22); }
+.ai-block + .ai-block { border-top: 2px solid rgba(240,192,64,.18); }
+.ai-block-title {
+  font-size: 1rem; font-weight: 800; color: var(--gld-l); letter-spacing: .04em;
+  margin-bottom: 14px; padding-bottom: 10px; display: flex; align-items: center; gap: 7px;
+  border-bottom: 1px solid rgba(240,192,64,.2);
+}
+.ai-block-title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(to right, rgba(240,192,64,.2), transparent); }
+.ai-block-body { font-size: 1rem; line-height: 1.8; color: #cfc0e8; word-break: keep-all; }
+.ai-block-body strong { color: var(--gld-l); font-weight: 700; }
+.card-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 14px; }
+.card-tag {
+  display: inline-block; padding: 3px 10px; border-radius: 20px;
+  font-size: .78rem; font-weight: 600; letter-spacing: .04em;
+  color: var(--pur-l); background: rgba(108,63,197,.18);
+  border: 1px solid rgba(155,110,243,.4);
+}
+.continue-wrap { text-align: center; padding: 16px 0 4px; border-top: 1px dashed rgba(155,110,243,.3); margin-top: 4px; }
+.continue-note { font-size: .74rem; color: var(--dim); margin-bottom: 10px; }
+.continue-btn { background: rgba(108,63,197,.18); border: 1px solid var(--pur-l); border-radius: var(--r); padding: 9px 24px; color: var(--pur-l); font-size: .86rem; font-weight: 600; cursor: pointer; transition: all .22s; font-family: inherit; }
+.continue-btn:hover:not(:disabled) { background: rgba(108,63,197,.4); color: #fff; transform: translateY(-1px); }
+.continue-btn:disabled { opacity: .5; cursor: not-allowed; }
+.continue-loading {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  padding: 14px 0; color: var(--dim); font-size: .88rem;
+}
+.mini-spin {
+  width: 20px; height: 20px; flex-shrink: 0;
+  border: 2px solid rgba(155,110,243,.25);
+  border-top-color: var(--pur-l);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+
+/* 심층 분석 */
+.deep-btn {
+  display: block; width: 100%; margin: 20px 0 8px; padding: 16px;
+  background: linear-gradient(135deg, rgba(200,160,40,.12), rgba(108,63,197,.18), rgba(200,160,40,.12));
+  border: 1px solid var(--gold); border-radius: var(--r);
+  color: var(--gld-l); font-size: .95rem; font-weight: 700; letter-spacing: .06em;
+  cursor: pointer; font-family: inherit; transition: all .3s;
+  box-shadow: 0 4px 20px rgba(200,160,40,.2);
+}
+.deep-btn:hover { background: linear-gradient(135deg, rgba(200,160,40,.22), rgba(108,63,197,.3), rgba(200,160,40,.22)); transform: translateY(-2px); box-shadow: 0 8px 28px rgba(200,160,40,.35); }
+.deep-divider {
+  display: flex; align-items: center; gap: 12px;
+  margin: 28px 0 4px; color: var(--gold); font-size: .8rem; letter-spacing: .15em;
+}
+.deep-divider::before, .deep-divider::after {
+  content: ''; flex: 1; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+}
+
+/* 에러 */
+.err-box { background: rgba(200,50,50,.1); border: 1px solid rgba(200,80,80,.35); border-radius: var(--r); padding: 14px 18px; font-size: .84rem; color: #f0a0a0; line-height: 1.7; margin-bottom: 14px; }
+.err-box button { background: none; border: none; color: var(--gld-l); cursor: pointer; text-decoration: underline; font-size: .84rem; padding: 0; }
+
+/* 저장 버튼 */
+.save-row { display: flex; gap: 10px; margin: 20px 0 8px; flex-wrap: wrap; }
+.save-btn {
+  flex: 1; min-width: 80px; padding: 11px 8px;
+  background: rgba(255,255,255,.04); border: 1px solid rgba(155,110,243,.35);
+  border-radius: var(--r); color: var(--dim); font-size: .8rem; font-weight: 600;
+  cursor: pointer; transition: all .22s; display: flex; align-items: center; justify-content: center; gap: 4px;
+  font-family: inherit;
+}
+.save-btn:hover:not(:disabled) { border-color: var(--gold); color: var(--gld-l); background: rgba(240,192,64,.07); transform: translateY(-2px); }
+.save-btn:disabled { opacity: .5; cursor: not-allowed; }
+.save-btn.copied { border-color: #7dd87d; color: #7dd87d; }
+
+@media (max-width: 400px) {
+  .grid { grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); }
+  .sel-slot,.slot-label-text { width: 56px; }
+  .toggle-group { grid-template-columns: 1fr 1fr; }
+}
+
+/* ─── 방향 선택 팝업 ─── */
+#dirPopupOverlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.78);
+  display: flex; align-items: center; justify-content: center; z-index: 9000;
+}
+.dir-popup-inner {
+  background: linear-gradient(160deg, #1a0f40, #2a1a60);
+  border: 1px solid rgba(155,110,243,.5); border-radius: 16px;
+  padding: 24px 20px; width: 290px; text-align: center;
+  box-shadow: 0 8px 32px rgba(0,0,0,.6);
+}
+.dir-popup-title { font-size: 1rem; font-weight: 700; color: var(--gld-l); margin-bottom: 4px; }
+.dir-popup-sub   { font-size: .78rem; color: var(--dim); margin-bottom: 14px; }
+.dir-popup-img   {
+  width: 80px; height: 124px; object-fit: cover; border-radius: 6px;
+  margin: 0 auto 16px; display: block;
+  border: 1px solid rgba(155,110,243,.4); transition: transform .35s;
+}
+.dir-popup-img.rev { transform: rotate(180deg); }
+.dir-popup-btns  { display: flex; gap: 10px; }
+.dir-popup-btn   {
+  flex: 1; padding: 12px 6px; border-radius: 10px;
+  border: 1px solid rgba(155,110,243,.4);
+  background: rgba(255,255,255,.04);
+  color: var(--text); cursor: pointer; font-family: inherit;
+  font-size: .9rem; font-weight: 600; transition: all .22s;
+}
+.dir-popup-btn.up:hover  { background: rgba(108,63,197,.4); border-color: var(--pur-l); color: #fff; }
+.dir-popup-btn.rev { border-color: rgba(180,80,80,.4); color: var(--rose); }
+.dir-popup-btn.rev:hover { background: rgba(180,80,80,.25); border-color: var(--rose); }
+
+/* ─── 슬롯 방향 배지 ─── */
+.sel-slot { position: relative; }
+.slot-dir-badge {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: rgba(0,0,0,.82); font-size: .48rem; font-weight: 700;
+  text-align: center; padding: 2px 0; pointer-events: none; letter-spacing: .02em;
+}
+
+/* ─── 결과 레이아웃 토글 ─── */
+.result-layout-toggle { display: flex; justify-content: flex-end; gap: 6px; margin: 0 0 10px; }
+.result-layout-btn {
+  padding: 5px 12px; border-radius: 16px;
+  border: 1px solid rgba(155,110,243,.35); background: rgba(255,255,255,.04);
+  color: var(--dim); font-size: .72rem; cursor: pointer; font-family: inherit;
+  transition: all .2s;
+}
+.result-layout-btn.active { background: rgba(108,63,197,.3); border-color: var(--pur-l); color: var(--pur-l); }
+
+/* ─── 동그라미 배치 ─── */
+.result-cards-circular { position: relative; margin: 0 auto 24px; }
+.result-card-circular {
+  position: absolute; transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.result-card-circular .result-card-img { width: 56px; margin: 0; }
+
+/* ─── AI 리딩 섹션 ─── */
+.ai-section {
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(155,110,243,.22);
+  border-radius: var(--r);
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.ai-section:last-child { margin-bottom: 0; }
+.ai-section-title {
+  font-size: 1rem; font-weight: 800; color: #e0d4ff; letter-spacing: .04em;
+  padding: 16px 20px 13px;
+  display: flex; align-items: center; gap: 8px;
+  border-bottom: 1px solid rgba(224,212,255,.14);
+}
+.ai-section-title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(to right, rgba(224,212,255,.22), transparent); }
+.ai-section-body {
+  padding: 18px 20px 22px;
+  font-size: 1rem; line-height: 1.95; color: #cfc0e8; word-break: keep-all;
+}
+.ai-section-body strong { color: #fdf6e3; font-weight: 700; }
+.ai-section-body span + span { display: block; margin-top: .6em; }
+
+/* ─── 카드별 서브박스 ─── */
+.card-sub-box {
+  border: 1px solid rgba(155,110,243,.28); border-radius: 10px;
+  margin-bottom: 14px; overflow: hidden;
+  background: rgba(108,63,197,.08);
+}
+.card-sub-box:last-child { margin-bottom: 0; }
+.card-sub-header {
+  padding: 12px 16px;
+  background: rgba(108,63,197,.18);
+  font-size: .93rem; font-weight: 700;
+  color: #fdf6e3; letter-spacing: .02em;
+  border-bottom: 1px solid rgba(155,110,243,.2);
+}
+.card-sub-body {
+  padding: 14px 16px 16px;
+  font-size: .95rem; line-height: 1.9; color: #cfc0e8; word-break: keep-all;
+}
+.card-sub-body strong { color: #fdf6e3; font-weight: 700; }
+.card-sub-body span + span { display: block; margin-top: .5em; }
+</style>
+</head>
+<body>
+
+<div class="stars" id="stars"></div>
+<div class="moon"></div>
+
+<div class="wrap">
+  <header>
+    <div class="cat-badge" id="catBadge">타로 리딩</div>
+    <h1>타로 카드 리딩</h1>
+    <p>Virtual Tarot Reading</p>
+  </header>
+
+  <!-- ═══ 화면 0: 카테고리 선택 (URL 파라미터 없을 때) ═══ -->
+  <div class="screen active" id="screen-category">
+    <div class="cat-sel-intro">
+      <p>어떤 주제로 리딩을 받고 싶으신가요?</p>
+    </div>
+    <div class="cat-sel-grid" id="catSelGrid"></div>
+  </div>
+
+  <!-- ═══ 화면 1: 설정 ═══ -->
+  <div class="screen" id="screen-setup">
+
+    <!-- 고민 입력 -->
+    <div class="card-box active-box" id="box1">
+      <div class="box-label"><span class="box-num">1</span> 고민 입력</div>
+      <p class="box-title">지금 가장 고민되는 것은 무엇인가요?</p>
+      <textarea class="worry-ta" id="worryInput" maxlength="300"
+        placeholder="타로에게 물어보고 싶은 고민이나 질문을 자유롭게 적어주세요..."
+        oninput="onWorry(this)"></textarea>
+      <div class="char-count"><span id="charNum">0</span> / 300</div>
+    </div>
+
+    <!-- 방향 설정 -->
+    <div class="card-box" id="box2">
+      <div class="box-label"><span class="box-num">2</span> 방향 설정</div>
+      <p class="box-title">역방향 카드를 포함할까요?</p>
+      <div class="toggle-group">
+        <button class="toggle-btn" onclick="selDir(this,'upright')">
+          <span class="t-icon">↑</span>
+          <span class="t-name">정방향만</span>
+          <span class="t-desc">긍정적이고 명확한<br>메시지에 집중</span>
+        </button>
+        <button class="toggle-btn" onclick="selDir(this,'both')">
+          <span class="t-icon">↕</span>
+          <span class="t-name">정방향 + 역방향</span>
+          <span class="t-desc">더 깊고 입체적인<br>해석 포함</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 리딩 방식 / 인물 정보 -->
+    <div class="card-box" id="box3">
+      <div class="box-label"><span class="box-num">3</span> <span id="box3Label">리딩 방식</span></div>
+
+      <!-- 일반 카테고리: 타로만 / 타로+사주 -->
+      <div id="mode-section">
+        <p class="box-title">사주와 함께 해석할까요?</p>
+        <div class="toggle-group">
+          <button class="toggle-btn" onclick="selMode(this,'tarot')">
+            <span class="t-icon">🃏</span>
+            <span class="t-name">타로만 보기</span>
+            <span class="t-desc">카드 상징으로만<br>해석합니다</span>
+          </button>
+          <button class="toggle-btn" onclick="selMode(this,'saju')">
+            <span class="t-icon">☯️</span>
+            <span class="t-name">타로 + 사주</span>
+            <span class="t-desc">사주팔자를 융합해<br>더 깊이 해석합니다</span>
+          </button>
+        </div>
+
+        <!-- 사주 필드 (타로+사주 선택시 표시) -->
+        <div id="saju-section" style="display:none; margin-top:14px;">
+          <div class="saju-fields">
+            <div>
+              <label class="saju-label">이름 (선택)</label>
+              <input class="saju-inp" id="sajuName" type="text" placeholder="홍길동" maxlength="20">
+            </div>
+            <div>
+              <label class="saju-label">성별 (선택)</label>
+              <div class="gender-row">
+                <button class="gender-btn" onclick="selGender(this,'남','my')">남</button>
+                <button class="gender-btn" onclick="selGender(this,'여','my')">여</button>
+              </div>
+            </div>
+            <div class="saju-full">
+              <label class="saju-label">생년월일 <span style="color:var(--rose)">*</span></label>
+              <input class="saju-inp rose" id="sajuDate" type="date" min="1920-01-01" max="2010-12-31" oninput="checkStart()">
+            </div>
+            <div class="saju-full">
+              <label class="saju-label">태어난 시간 (선택)</label>
+              <select class="saju-inp" id="sajuHour">
+                <option value="">모름</option>
+                <option value="23">23시 · 子시 (밤 11~12시)</option>
+                <option value="0">00시 · 子시 (밤 12~1시)</option>
+                <option value="1">01시 · 丑시 (새벽 1~2시)</option>
+                <option value="2">02시 · 丑시 (새벽 2~3시)</option>
+                <option value="3">03시 · 寅시 (새벽 3~4시)</option>
+                <option value="4">04시 · 寅시 (새벽 4~5시)</option>
+                <option value="5">05시 · 卯시 (새벽 5~6시)</option>
+                <option value="6">06시 · 卯시 (아침 6~7시)</option>
+                <option value="7">07시 · 辰시 (아침 7~8시)</option>
+                <option value="8">08시 · 辰시 (아침 8~9시)</option>
+                <option value="9">09시 · 巳시 (오전 9~10시)</option>
+                <option value="10">10시 · 巳시 (오전 10~11시)</option>
+                <option value="11">11시 · 午시 (오전 11~12시)</option>
+                <option value="12">12시 · 午시 (오후 12~1시)</option>
+                <option value="13">13시 · 未시 (오후 1~2시)</option>
+                <option value="14">14시 · 未시 (오후 2~3시)</option>
+                <option value="15">15시 · 申시 (오후 3~4시)</option>
+                <option value="16">16시 · 申시 (오후 4~5시)</option>
+                <option value="17">17시 · 酉시 (오후 5~6시)</option>
+                <option value="18">18시 · 酉시 (저녁 6~7시)</option>
+                <option value="19">19시 · 戌시 (저녁 7~8시)</option>
+                <option value="20">20시 · 戌시 (저녁 8~9시)</option>
+                <option value="21">21시 · 亥시 (밤 9~10시)</option>
+                <option value="22">22시 · 亥시 (밤 10~11시)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 궁합 전용: 두 사람 정보 -->
+      <div id="gunghap-section" style="display:none;">
+
+        <!-- 리딩 방식 토글 -->
+        <p class="box-title" style="margin-bottom:12px">리딩 방식을 선택해주세요</p>
+        <div class="toggle-group" style="margin-bottom:18px">
+          <button class="toggle-btn" onclick="selGhMode(this,'tarot')">
+            <span class="t-icon">🃏</span>
+            <span class="t-name">타로만 보기</span>
+            <span class="t-desc">카드 상징으로만<br>궁합을 해석합니다</span>
+          </button>
+          <button class="toggle-btn" onclick="selGhMode(this,'saju')">
+            <span class="t-icon">☯️</span>
+            <span class="t-name">타로 + 사주</span>
+            <span class="t-desc">사주팔자를 융합해<br>더 깊이 해석합니다</span>
+          </button>
+        </div>
+
+        <p class="box-title" style="margin-bottom:14px">두 사람의 정보를 입력해주세요</p>
+
+        <div class="person-box">
+          <div class="person-title"><span>👤</span> 나의 정보</div>
+          <div class="saju-fields">
+            <div>
+              <label class="saju-label">이름 (선택)</label>
+              <input class="saju-inp" id="myName" type="text" placeholder="나의 이름" maxlength="20">
+            </div>
+            <div>
+              <label class="saju-label">성별</label>
+              <div class="gender-row">
+                <button class="gender-btn" onclick="selGender(this,'남','my')">남</button>
+                <button class="gender-btn" onclick="selGender(this,'여','my')">여</button>
+              </div>
+            </div>
+            <div class="saju-full gh-saju-field" style="display:none">
+              <label class="saju-label">생년월일 <span style="color:var(--rose)">*</span></label>
+              <input class="saju-inp rose" id="myDate" type="date" min="1920-01-01" max="2010-12-31" oninput="checkStart()">
+            </div>
+            <div class="saju-full gh-saju-field" style="display:none">
+              <label class="saju-label">태어난 시간 (선택)</label>
+              <select class="saju-inp" id="myHour">
+                <option value="">모름</option>
+                <option value="23">23시 · 子시</option><option value="0">00시 · 子시</option>
+                <option value="1">01시 · 丑시</option><option value="2">02시 · 丑시</option>
+                <option value="3">03시 · 寅시</option><option value="4">04시 · 寅시</option>
+                <option value="5">05시 · 卯시</option><option value="6">06시 · 卯시</option>
+                <option value="7">07시 · 辰시</option><option value="8">08시 · 辰시</option>
+                <option value="9">09시 · 巳시</option><option value="10">10시 · 巳시</option>
+                <option value="11">11시 · 午시</option><option value="12">12시 · 午시</option>
+                <option value="13">13시 · 未시</option><option value="14">14시 · 未시</option>
+                <option value="15">15시 · 申시</option><option value="16">16시 · 申시</option>
+                <option value="17">17시 · 酉시</option><option value="18">18시 · 酉시</option>
+                <option value="19">19시 · 戌시</option><option value="20">20시 · 戌시</option>
+                <option value="21">21시 · 亥시</option><option value="22">22시 · 亥시</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="person-box">
+          <div class="person-title"><span>👥</span> 상대방 정보</div>
+          <div class="saju-fields">
+            <div>
+              <label class="saju-label">이름 (선택)</label>
+              <input class="saju-inp" id="partnerName" type="text" placeholder="상대방 이름" maxlength="20">
+            </div>
+            <div>
+              <label class="saju-label">성별</label>
+              <div class="gender-row">
+                <button class="gender-btn" onclick="selGender(this,'남','partner')">남</button>
+                <button class="gender-btn" onclick="selGender(this,'여','partner')">여</button>
+              </div>
+            </div>
+            <div class="saju-full gh-saju-field" style="display:none">
+              <label class="saju-label">생년월일 <span style="color:var(--rose)">*</span></label>
+              <input class="saju-inp rose" id="partnerDate" type="date" min="1920-01-01" max="2010-12-31" oninput="checkStart()">
+            </div>
+            <div class="saju-full gh-saju-field" style="display:none">
+              <label class="saju-label">태어난 시간 (선택)</label>
+              <select class="saju-inp" id="partnerHour">
+                <option value="">모름</option>
+                <option value="23">23시 · 子시</option><option value="0">00시 · 子시</option>
+                <option value="1">01시 · 丑시</option><option value="2">02시 · 丑시</option>
+                <option value="3">03시 · 寅시</option><option value="4">04시 · 寅시</option>
+                <option value="5">05시 · 卯시</option><option value="6">06시 · 卯시</option>
+                <option value="7">07시 · 辰시</option><option value="8">08시 · 辰시</option>
+                <option value="9">09시 · 巳시</option><option value="10">10시 · 巳시</option>
+                <option value="11">11시 · 午시</option><option value="12">12시 · 午시</option>
+                <option value="13">13시 · 未시</option><option value="14">14시 · 未시</option>
+                <option value="15">15시 · 申시</option><option value="16">16시 · 申시</option>
+                <option value="17">17시 · 酉시</option><option value="18">18시 · 酉시</option>
+                <option value="19">19시 · 戌시</option><option value="20">20시 · 戌시</option>
+                <option value="21">21시 · 亥시</option><option value="22">22시 · 亥시</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- API 키 -->
+    <div class="card-box" id="box4">
+      <div class="box-label"><span class="box-num">4</span> AI 리딩 설정 (선택)</div>
+      <p class="box-title" style="font-size:.9rem">Claude API 키를 입력하면 AI가 직접 리딩해드려요</p>
+      <p style="font-size:.76rem;color:var(--dim);line-height:1.6;margin-bottom:2px">키는 브라우저에만 저장되며 외부로 전송되지 않습니다.</p>
+      <div class="api-row">
+        <input class="api-inp" id="apiKeyInput" type="password" placeholder="sk-ant-api03-...">
+        <button class="api-save-btn" onclick="saveApiKey()">저장</button>
+      </div>
+      <div class="api-status" id="apiStatus"></div>
+    </div>
+
+    <button class="start-btn" id="startBtn" onclick="goToCards()" disabled>
+      ✦ 카드를 뽑으러 가기
+    </button>
+    <button class="reset-btn" style="margin-top:10px" onclick="showScreen('screen-category')">← 카테고리 선택으로</button>
+  </div>
+
+
+  <!-- ═══ 화면 2: 카드 선택 ═══ -->
+  <div class="screen" id="screen-cards">
+
+    <div class="progress-bar">
+      <span class="prog-count" id="progCount">0 / 5</span>
+      <div class="prog-dots" id="progDots"></div>
+    </div>
+
+    <div id="slotArea"></div>
+
+    <!-- 모드 선택 -->
+    <div class="mode-select-row" id="modeSelectRow">
+      <button class="mode-select-btn active" id="tab-virtual" onclick="setCardMode('virtual')">
+        <span class="msb-icon">🎴</span>
+        <span class="msb-title">가상 카드</span>
+        <span class="msb-desc">화면에서 직접 뽑기</span>
+      </button>
+      <button class="mode-select-btn" id="tab-real" onclick="setCardMode('real')">
+        <span class="msb-icon">🃏</span>
+        <span class="msb-title">실물 카드</span>
+        <span class="msb-desc">내가 뽑은 카드 입력</span>
+      </button>
+    </div>
+
+    <!-- 현재 모드 뱃지 -->
+    <div class="mode-badge-row">
+      <span class="mode-badge" id="modeBadge">🎴 가상 카드 모드</span>
+    </div>
+
+    <p class="hint" id="hint">✦ 마음이 이끄는 카드를 선택해주세요 ✦</p>
+
+    <!-- 가상카드 팬 -->
+    <div id="virtual-card-area">
+      <div class="fan-container" id="fan-container"></div>
+    </div>
+
+    <!-- 실물카드 검색 -->
+    <div class="real-card-area" id="real-card-area">
+      <p style="font-size:.8rem;color:var(--dim);margin-bottom:10px;line-height:1.6;">
+        실물로 뽑은 카드를 검색해서 선택해주세요. <strong style="color:var(--gld-l)" id="realCardCountLabel">5장</strong>을 입력하면 리딩이 시작됩니다.
+      </p>
+      <input class="search-inp" id="cardSearch" placeholder="카드 이름으로 검색 (예: 바보, 태양, Fool…)" oninput="filterCards(this.value)">
+      <div class="search-results" id="searchResults"></div>
+    </div>
+
+    <button class="next-btn" id="nextBtn" onclick="startReading()">✦ 리딩 시작하기</button>
+    <button class="reset-btn" id="reshuffleBtn" onclick="reshuffleCards()">↩ 카드 다시 섞기</button>
+    <button class="reset-btn" style="margin-top:6px" onclick="goBack()">← 고민 입력으로</button>
+    <button class="reset-btn" style="margin-top:6px" onclick="showScreen('screen-category')">← 처음으로 (카테고리 선택)</button>
+  </div>
+
+
+  <!-- ═══ 화면 3: 로딩 ═══ -->
+  <div class="screen" id="screen-loading">
+    <div class="loading-wrap">
+      <div class="loading-orbit">
+        <div class="loading-center">✦</div>
+        <span class="orbit-star" style="--dur:2.8s;--dl:0s;--r:44px">✦</span>
+        <span class="orbit-star" style="--dur:3.2s;--dl:-.5s;--r:44px">★</span>
+        <span class="orbit-star" style="--dur:2.5s;--dl:-1s;--r:44px">✦</span>
+        <span class="orbit-star" style="--dur:3.6s;--dl:-1.5s;--r:44px">★</span>
+        <span class="orbit-star" style="--dur:2.2s;--dl:-2s;--r:44px">✦</span>
+        <span class="orbit-star" style="--dur:3s;--dl:-2.5s;--r:44px">★</span>
+      </div>
+      <p class="loading-title">별들이 메시지를 읽고 있어요</p>
+      <div class="loading-dots"><span></span><span></span><span></span></div>
+      <p class="loading-msg" id="loadingMsg">카드의 상징을 해석하는 중...</p>
+    </div>
+  </div>
+
+
+  <!-- ═══ 화면 4: 결과 ═══ -->
+  <div class="screen" id="screen-result">
+
+    <div class="result-header">
+      <h2 id="resultTitle">타로 리딩 결과</h2>
+      <p class="result-worry" id="resultWorry"></p>
+    </div>
+
+    <!-- 결과 카드 배치 토글 -->
+    <div class="result-layout-toggle" id="resultLayoutToggle" style="display:none;">
+      <button class="result-layout-btn active" id="layoutRowBtn" onclick="setResultLayout('row')">가로 배치</button>
+      <button class="result-layout-btn" id="layoutCircleBtn" onclick="setResultLayout('circle')">⭕ 동그라미</button>
+    </div>
+
+    <div id="resultCardsArea"></div>
+    <div class="ai-wrap" id="aiWrap"></div>
+
+    <!-- 심층 분석 버튼 (5장 리딩 완료 후 표시) -->
+    <div id="deepAnalysisBtn" style="display:none;" data-html2canvas-ignore>
+      <button class="deep-btn" onclick="startDeepAnalysis()">
+        🔮 베테랑의 심층 조언 — 카드 2장 더 듣기
+      </button>
+    </div>
+
+    <!-- 심층 카드 선택 영역 (동적) -->
+    <div id="deepCardArea" style="display:none;" data-html2canvas-ignore>
+      <p class="hint" id="deepHint">✦ 결정적 조언을 위한 카드 2장을 더 골라주세요 ✦</p>
+      <!-- 가상 카드 모드: 팬 스프레드 -->
+      <div id="deep-virtual-area">
+        <div class="fan-container" id="deep-fan-container"></div>
+      </div>
+      <!-- 실물 카드 모드: 검색 UI -->
+      <div id="deep-real-area" style="display:none;">
+        <p style="font-size:.8rem;color:var(--dim);margin-bottom:10px;line-height:1.6;">
+          실물로 뽑은 카드를 검색해서 선택해주세요. <strong style="color:var(--gld-l)">2장</strong>을 입력하면 심층 분석이 시작됩니다.
+        </p>
+        <div class="slot-labels">
+          <span class="slot-label-text">심층 카드 1</span>
+          <span class="slot-label-text">심층 카드 2</span>
+        </div>
+        <div class="selected-row" id="deepSlotRow">
+          <div class="sel-slot" data-deep-i="0">1</div>
+          <div class="sel-slot" data-deep-i="1">2</div>
+        </div>
+        <input class="search-inp" id="deepCardSearch" placeholder="카드 이름으로 검색 (예: 바보, 태양, Fool…)" oninput="filterDeepCards(this.value)">
+        <div class="search-results" id="deepSearchResults"></div>
+      </div>
+    </div>
+
+    <div class="save-row" data-html2canvas-ignore>
+      <button class="save-btn" id="pdfBtn"  onclick="savePDF()">📄 PDF</button>
+      <button class="save-btn" id="imgBtn"  onclick="saveImg()">🖼️ 이미지</button>
+      <button class="save-btn" id="copyBtn" onclick="copyText()">📋 텍스트</button>
+    </div>
+
+    <button class="reset-btn" onclick="resetAll()" data-html2canvas-ignore style="margin-top:4px">↩ 처음부터 다시하기</button>
+  </div>
+
+</div><!-- /wrap -->
+
+<script>
+/* ─── 별 생성 ─── */
+(function() {
+  const c = document.getElementById('stars');
+  for (let i = 0; i < 110; i++) {
+    const s = document.createElement('span');
+    const sz = Math.random() * 2.4 + .4;
+    s.style.cssText = `left:${Math.random()*100}%;top:${Math.random()*100}%;
+      width:${sz}px;height:${sz}px;
+      --d:${(Math.random()*3+1.5).toFixed(1)}s;
+      --o:${(Math.random()*.5+.3).toFixed(2)};
+      animation-delay:${(Math.random()*4).toFixed(1)}s`;
+    c.appendChild(s);
+  }
+})();
+
+/* ─── 78장 카드 데이터 ─── */
+const CDN = './images/';
+
+const CARDS = [
+  {id:'M00',name:'바보',          en:'The Fool',           img:'fool.jpg'},
+  {id:'M01',name:'마법사',         en:'The Magician',       img:'magician.jpg'},
+  {id:'M02',name:'여사제',         en:'The High Priestess', img:'highpriestess.jpg'},
+  {id:'M03',name:'여황제',         en:'The Empress',        img:'empress.jpg'},
+  {id:'M04',name:'황제',           en:'The Emperor',        img:'emperor.jpg'},
+  {id:'M05',name:'교황',           en:'The Hierophant',     img:'hierophant.jpg'},
+  {id:'M06',name:'연인',           en:'The Lovers',         img:'lovers.jpg'},
+  {id:'M07',name:'전차',           en:'The Chariot',        img:'chariot.jpg'},
+  {id:'M08',name:'힘',             en:'Strength',           img:'strength.jpg'},
+  {id:'M09',name:'은둔자',         en:'The Hermit',         img:'hermit.jpg'},
+  {id:'M10',name:'운명의 수레바퀴',en:'Wheel of Fortune',   img:'Wheel.jpg'},
+  {id:'M11',name:'정의',           en:'Justice',            img:'justice.jpg'},
+  {id:'M12',name:'매달린 사람',    en:'The Hanged Man',     img:'hangedman.jpg'},
+  {id:'M13',name:'죽음',           en:'Death',              img:'death.jpg'},
+  {id:'M14',name:'절제',           en:'Temperance',         img:'temperance.jpg'},
+  {id:'M15',name:'악마',           en:'The Devil',          img:'devil.jpg'},
+  {id:'M16',name:'탑',             en:'The Tower',          img:'tower.jpg'},
+  {id:'M17',name:'별',             en:'The Star',           img:'star.jpg'},
+  {id:'M18',name:'달',             en:'The Moon',           img:'moon.jpg'},
+  {id:'M19',name:'태양',           en:'The Sun',            img:'sun.jpg'},
+  {id:'M20',name:'심판',           en:'Judgement',          img:'judgement.jpg'},
+  {id:'M21',name:'세계',           en:'The World',          img:'world.jpg'},
+  {id:'W01',name:'완드 에이스', en:'Ace of Wands',       img:'wands01.jpg'},
+  {id:'W02',name:'완드 2',      en:'Two of Wands',       img:'wands02.jpg'},
+  {id:'W03',name:'완드 3',      en:'Three of Wands',     img:'wands03.jpg'},
+  {id:'W04',name:'완드 4',      en:'Four of Wands',      img:'wands04.jpg'},
+  {id:'W05',name:'완드 5',      en:'Five of Wands',      img:'wands05.jpg'},
+  {id:'W06',name:'완드 6',      en:'Six of Wands',       img:'wands06.jpg'},
+  {id:'W07',name:'완드 7',      en:'Seven of Wands',     img:'wands07.jpg'},
+  {id:'W08',name:'완드 8',      en:'Eight of Wands',     img:'wands08.jpg'},
+  {id:'W09',name:'완드 9',      en:'Nine of Wands',      img:'wands09.jpg'},
+  {id:'W10',name:'완드 10',     en:'Ten of Wands',       img:'wands10.jpg'},
+  {id:'W11',name:'완드 페이지', en:'Page of Wands',      img:'wands11.jpg'},
+  {id:'W12',name:'완드 나이트', en:'Knight of Wands',    img:'wands12.jpg'},
+  {id:'W13',name:'완드 퀸',     en:'Queen of Wands',     img:'wands13.jpg'},
+  {id:'W14',name:'완드 킹',     en:'King of Wands',      img:'wands14.jpg'},
+  {id:'C01',name:'컵 에이스',   en:'Ace of Cups',        img:'cups01.jpg'},
+  {id:'C02',name:'컵 2',        en:'Two of Cups',        img:'cups02.jpg'},
+  {id:'C03',name:'컵 3',        en:'Three of Cups',      img:'cups03.jpg'},
+  {id:'C04',name:'컵 4',        en:'Four of Cups',       img:'cups04.jpg'},
+  {id:'C05',name:'컵 5',        en:'Five of Cups',       img:'cups05.jpg'},
+  {id:'C06',name:'컵 6',        en:'Six of Cups',        img:'cups06.jpg'},
+  {id:'C07',name:'컵 7',        en:'Seven of Cups',      img:'cups07.jpg'},
+  {id:'C08',name:'컵 8',        en:'Eight of Cups',      img:'cups08.jpg'},
+  {id:'C09',name:'컵 9',        en:'Nine of Cups',       img:'cups09.jpg'},
+  {id:'C10',name:'컵 10',       en:'Ten of Cups',        img:'cups10.jpg'},
+  {id:'C11',name:'컵 페이지',   en:'Page of Cups',       img:'cups11.jpg'},
+  {id:'C12',name:'컵 나이트',   en:'Knight of Cups',     img:'cups12.jpg'},
+  {id:'C13',name:'컵 퀸',       en:'Queen of Cups',      img:'cups13.jpg'},
+  {id:'C14',name:'컵 킹',       en:'King of Cups',       img:'cups14.jpg'},
+  {id:'S01',name:'소드 에이스', en:'Ace of Swords',      img:'swords01.jpg'},
+  {id:'S02',name:'소드 2',      en:'Two of Swords',      img:'swords02.jpg'},
+  {id:'S03',name:'소드 3',      en:'Three of Swords',    img:'swords03.jpg'},
+  {id:'S04',name:'소드 4',      en:'Four of Swords',     img:'swords04.jpg'},
+  {id:'S05',name:'소드 5',      en:'Five of Swords',     img:'swords05.jpg'},
+  {id:'S06',name:'소드 6',      en:'Six of Swords',      img:'swords06.jpg'},
+  {id:'S07',name:'소드 7',      en:'Seven of Swords',    img:'swords07.jpg'},
+  {id:'S08',name:'소드 8',      en:'Eight of Swords',    img:'swords08.jpg'},
+  {id:'S09',name:'소드 9',      en:'Nine of Swords',     img:'swords09.jpg'},
+  {id:'S10',name:'소드 10',     en:'Ten of Swords',      img:'swords10.jpg'},
+  {id:'S11',name:'소드 페이지', en:'Page of Swords',     img:'swords11.jpg'},
+  {id:'S12',name:'소드 나이트', en:'Knight of Swords',   img:'swords12.jpg'},
+  {id:'S13',name:'소드 퀸',     en:'Queen of Swords',    img:'swords13.jpg'},
+  {id:'S14',name:'소드 킹',     en:'King of Swords',     img:'swords14.jpg'},
+  {id:'P01',name:'펜타클 에이스',en:'Ace of Pentacles',  img:'pents01.jpg'},
+  {id:'P02',name:'펜타클 2',    en:'Two of Pentacles',   img:'pents02.jpg'},
+  {id:'P03',name:'펜타클 3',    en:'Three of Pentacles', img:'pents03.jpg'},
+  {id:'P04',name:'펜타클 4',    en:'Four of Pentacles',  img:'pents04.jpg'},
+  {id:'P05',name:'펜타클 5',    en:'Five of Pentacles',  img:'pents05.jpg'},
+  {id:'P06',name:'펜타클 6',    en:'Six of Pentacles',   img:'pents06.jpg'},
+  {id:'P07',name:'펜타클 7',    en:'Seven of Pentacles', img:'pents07.jpg'},
+  {id:'P08',name:'펜타클 8',    en:'Eight of Pentacles', img:'pents08.jpg'},
+  {id:'P09',name:'펜타클 9',    en:'Nine of Pentacles',  img:'pents09.jpg'},
+  {id:'P10',name:'펜타클 10',   en:'Ten of Pentacles',   img:'pents10.jpg'},
+  {id:'P11',name:'펜타클 페이지',en:'Page of Pentacles', img:'pents11.jpg'},
+  {id:'P12',name:'펜타클 나이트',en:'Knight of Pentacles',img:'pents12.jpg'},
+  {id:'P13',name:'펜타클 퀸',   en:'Queen of Pentacles', img:'pents13.jpg'},
+  {id:'P14',name:'펜타클 킹',   en:'King of Pentacles',  img:'pents14.jpg'},
+];
+
+/* ─── 카테고리 ─── */
+const CATEGORIES = {
+  '종합운세':  { icon:'🌟', focus:'전반적 운세, 현재 에너지, 앞으로의 흐름' },
+  '연애/사랑': { icon:'💕', focus:'감정, 관계, 사랑의 흐름과 인연' },
+  '직장/취업': { icon:'💼', focus:'직장 환경, 커리어, 취업·이직 기회' },
+  '사업/창업': { icon:'🚀', focus:'사업 방향, 파트너십, 성공 가능성' },
+  '재물/금전': { icon:'💰', focus:'재정 흐름, 투자, 금전적 기회와 위험' },
+  '건강':      { icon:'🌿', focus:'신체적·정신적 건강, 에너지 흐름' },
+  '인간관계':  { icon:'🤝', focus:'대인관계, 신뢰, 소통과 갈등' },
+  '진로/미래': { icon:'🔮', focus:'미래 방향, 선택, 성장과 가능성' },
+  '궁합':      { icon:'💑', focus:'에너지 조화, 관계 강점/약점, 미래 가능성', isGungHap: true },
+  '오늘의카드':{ icon:'🌅', focus:'오늘의 에너지, 주의사항, 행운 포인트', noSaju: true, cardCount: 1 },
+  '결정도우미':{ icon:'⚖️', focus:'두 방향 비교, 결정의 핵심, 최선의 방향', noSaju: true, cardCount: 6 },
+  // 카테고리 선택 화면용 별칭
+  '직장취업':  { icon:'💼', focus:'직장 환경, 커리어, 취업·이직 기회', desc:'직장·취업·이직 방향' },
+  '재물투자':  { icon:'💰', focus:'재정 흐름, 투자 판단, 금전적 기회와 위험', desc:'재물·투자·금전운' },
+  '연애결혼':  { icon:'💕', focus:'감정 흐름, 인연, 사랑과 결혼', desc:'연애·사랑·결혼 인연' },
+};
+
+/* ─── 포지션 맵 ─── */
+const POSITIONS_MAP = {
+  '궁합': [
+    {label:'나의 에너지',   group:'나의 카드'},
+    {label:'나의 감정',     group:'나의 카드'},
+    {label:'나의 방식',     group:'나의 카드'},
+    {label:'상대 에너지',   group:'상대방의 카드'},
+    {label:'상대 감정',     group:'상대방의 카드'},
+    {label:'상대 방식',     group:'상대방의 카드'},
+    {label:'관계의 흐름',   group:'관계의 카드'},
+    {label:'미래 가능성',   group:'관계의 카드'},
+  ],
+  '연애/사랑': [
+    {label:'나의 감정'},
+    {label:'상대의 마음'},
+    {label:'관계의 현재'},
+    {label:'넘어야 할 것'},
+    {label:'관계의 미래'},
+  ],
+  '직장/취업': [
+    {label:'현재 상황'},
+    {label:'강점'},
+    {label:'장애물'},
+    {label:'조언'},
+    {label:'결과'},
+  ],
+  '사업/창업': [
+    {label:'현재 에너지'},
+    {label:'핵심 과제'},
+    {label:'기회'},
+    {label:'주의사항'},
+    {label:'방향'},
+  ],
+  '재물/금전': [
+    {label:'현재 재물운'},
+    {label:'기회'},
+    {label:'위험 요소'},
+    {label:'조언'},
+    {label:'결과'},
+  ],
+  '건강': [
+    {label:'몸의 상태'},
+    {label:'마음의 상태'},
+    {label:'주의 영역'},
+    {label:'치유 에너지'},
+    {label:'앞으로'},
+  ],
+  '인간관계': [
+    {label:'관계의 현재'},
+    {label:'핵심 감정'},
+    {label:'원인'},
+    {label:'조언'},
+    {label:'변화'},
+  ],
+  '오늘의카드': [
+    {label:'오늘의 메시지'},
+  ],
+  '결정도우미': [
+    {label:'선택 A'},
+    {label:'A의 결과'},
+    {label:'A의 주의'},
+    {label:'선택 B'},
+    {label:'B의 결과'},
+    {label:'B의 주의'},
+  ],
+  default: [
+    {label:'현재 상황'},
+    {label:'핵심 과제'},
+    {label:'과거 뿌리'},
+    {label:'조언'},
+    {label:'흐름 방향'},
+  ],
+};
+// 카테고리 별칭 포지션 재사용
+POSITIONS_MAP['직장취업'] = POSITIONS_MAP['직장/취업'];
+POSITIONS_MAP['재물투자'] = POSITIONS_MAP['재물/금전'];
+POSITIONS_MAP['연애결혼'] = POSITIONS_MAP['연애/사랑'];
+
+function getPositions() {
+  return POSITIONS_MAP[category] || POSITIONS_MAP.default;
+}
+
+/* ─── 상태 ─── */
+let deck    = [];
+let picked  = [];   // { card, reversed }
+let category   = '타로 리딩';
+let catInfo    = null;
+let dirMode    = null;   // 'upright' | 'both'
+let readingMode = null;  // 'tarot' | 'saju'
+let isGungHap  = false;
+let isNoSaju   = false;
+let pickCount  = 5;
+let gungHapStage = 1;   // 1=나 2=상대방 3=관계
+
+// 궁합 단계별 설정 (3+3+2)
+const GH_STAGES = [
+  { count: 3, label: '나의 카드', groupLabel: '나 (Me)' },
+  { count: 3, label: '상대방 카드', groupLabel: '상대방 (Partner)' },
+  { count: 2, label: '관계 카드', groupLabel: '관계 (Relation)' },
+];
+function ghStageStart(stage) {
+  return GH_STAGES.slice(0, stage - 1).reduce((s, c) => s + c.count, 0);
+}
+let myGender   = null;
+let partnerGender = null;
+let cardMode   = 'virtual'; // 'virtual' | 'real'
+let apiKey     = '';
+let continuation = null;
+let deepPicked = [];
+let deepDeck   = [];
+let resultLayout = 'row'; // 'row' | 'circle'
+
+/* ─── 카테고리 선택 화면 버튼 렌더 ─── */
+const CAT_SEL_LIST = [
+  { key:'종합운세',  icon:'🌟', desc:'전반적 운세 흐름' },
+  { key:'궁합',     icon:'💑', desc:'두 사람의 궁합 분석' },
+  { key:'직장취업', icon:'💼', desc:'직장·취업·이직' },
+  { key:'재물투자', icon:'💰', desc:'재물·투자·금전운' },
+  { key:'연애결혼', icon:'💕', desc:'연애·사랑·결혼' },
+  { key:'건강',     icon:'🌿', desc:'몸과 마음의 건강' },
+  { key:'오늘의카드',icon:'🌅', desc:'오늘 하루의 메시지' },
+  { key:'결정도우미',icon:'⚖️', desc:'선택과 결정 도움' },
+];
+
+(function buildCatSelGrid() {
+  const grid = document.getElementById('catSelGrid');
+  CAT_SEL_LIST.forEach(({ key, icon, desc }) => {
+    const btn = document.createElement('button');
+    btn.className = 'cat-sel-card';
+    btn.innerHTML = `<span class="cat-sel-icon">${icon}</span><span class="cat-sel-name">${key}</span><span class="cat-sel-desc">${desc}</span>`;
+    btn.addEventListener('click', () => selectCategory(key));
+    grid.appendChild(btn);
+  });
+})();
+
+/* ─── 카테고리 선택 함수 ─── */
+function selectCategory(cat) {
+  applyCategory(cat);
+  showScreen('screen-setup');
+}
+
+function applyCategory(cat) {
+  if (!CATEGORIES[cat]) return;
+  category = cat;
+  catInfo  = CATEGORIES[cat];
+  document.getElementById('catBadge').textContent = `${catInfo.icon} ${cat}`;
+  document.title = `${cat} 타로 리딩`;
+
+  // 초기화 (resetAll 대신 상태만 정리)
+  isGungHap = false; isNoSaju = false; pickCount = 5; readingMode = null;
+  document.getElementById('mode-section').style.display = '';
+  document.getElementById('gunghap-section').style.display = 'none';
+  document.getElementById('box3').style.display = '';
+  document.getElementById('box3Label').textContent = '리딩 방식';
+  document.getElementById('saju-section').style.display = 'none';
+
+  if (catInfo.isGungHap) {
+    isGungHap = true; pickCount = 8; readingMode = null;
+    document.getElementById('mode-section').style.display  = 'none';
+    document.getElementById('gunghap-section').style.display = 'block';
+    document.getElementById('box3Label').textContent = '리딩 방식 및 두 사람 정보';
+    // 토글 초기화
+    document.querySelectorAll('#gunghap-section .toggle-btn').forEach(b => b.classList.remove('sel'));
+    document.querySelectorAll('.gh-saju-field').forEach(f => f.style.display = 'none');
+  } else if (catInfo.noSaju) {
+    isNoSaju = true; pickCount = catInfo.cardCount || 5; readingMode = 'tarot';
+    document.getElementById('box3').style.display = 'none';
+  }
+}
+
+/* ─── 초기화 ─── */
+(function init() {
+  const params = new URLSearchParams(location.search);
+  const cat    = params.get('category') || '';
+
+  apiKey = localStorage.getItem('tarot_v2_key') || '';
+  if (apiKey) {
+    document.getElementById('apiKeyInput').value = apiKey;
+    const st = document.getElementById('apiStatus');
+    st.textContent = '✓ 저장된 API 키가 있습니다'; st.className = 'api-status ok';
+  }
+
+  if (cat && CATEGORIES[cat]) {
+    applyCategory(cat);
+    showScreen('screen-setup');
+  } else {
+    // URL 파라미터 없음 → 카테고리 선택 화면 유지
+    document.getElementById('catBadge').textContent = '✦ 타로 리딩';
+    category = '타로 리딩'; catInfo = null; pickCount = 5;
+    // screen-category가 이미 active이므로 그대로
+  }
+
+  checkStart();
+})();
+
+/* ─── 설정 화면 핸들러 ─── */
+function onWorry(el) {
+  document.getElementById('charNum').textContent = el.value.length;
+  document.getElementById('box2').classList.add('active-box');
+  checkStart();
+}
+
+function selDir(btn, mode) {
+  document.querySelectorAll('#box2 .toggle-btn').forEach(b => b.classList.remove('sel'));
+  btn.classList.add('sel');
+  dirMode = mode;
+  document.getElementById('box3').classList.add('active-box');
+  document.getElementById('box4').classList.add('active-box');
+  checkStart();
+}
+
+function selMode(btn, mode) {
+  document.querySelectorAll('#mode-section .toggle-btn').forEach(b => b.classList.remove('sel'));
+  btn.classList.add('sel');
+  readingMode = mode;
+  document.getElementById('saju-section').style.display = mode === 'saju' ? 'block' : 'none';
+  checkStart();
+}
+
+function selGhMode(btn, mode) {
+  document.querySelectorAll('#gunghap-section .toggle-btn').forEach(b => b.classList.remove('sel'));
+  btn.classList.add('sel');
+  readingMode = mode;
+  document.querySelectorAll('.gh-saju-field').forEach(f => f.style.display = mode === 'saju' ? '' : 'none');
+  checkStart();
+}
+
+function selGender(btn, g, who) {
+  const parent = btn.closest('.gender-row');
+  parent.querySelectorAll('.gender-btn').forEach(b => b.classList.remove('sel'));
+  btn.classList.add('sel');
+  if (who === 'my') myGender = g;
+  else if (who === 'partner') partnerGender = g;
+  else myGender = g; // legacy
+}
+
+function saveApiKey() {
+  const k = document.getElementById('apiKeyInput').value.trim();
+  if (!k) return;
+  localStorage.setItem('tarot_v2_key', k);
+  apiKey = k;
+  const st = document.getElementById('apiStatus');
+  st.textContent = '✓ API 키가 저장되었습니다'; st.className = 'api-status ok';
+}
+
+function checkStart() {
+  const worry = document.getElementById('worryInput').value.trim();
+  let valid = !!(worry && dirMode);
+
+  if (isGungHap) {
+    valid = valid && readingMode !== null;
+    if (readingMode === 'saju') {
+      const d1 = document.getElementById('myDate').value;
+      const d2 = document.getElementById('partnerDate').value;
+      valid = valid && !!(d1 && d2);
+    }
+  } else if (!isNoSaju) {
+    valid = valid && readingMode !== null;
+    if (readingMode === 'saju') {
+      valid = valid && !!document.getElementById('sajuDate').value;
+    }
+  }
+
+  document.getElementById('startBtn').disabled = !valid;
+}
+
+/* ─── 화면 전환 ─── */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function goToCards() {
+  deck   = shuffle([...CARDS]);
+  picked = [];
+  if (isGungHap) gungHapStage = 1;
+  cardMode = 'virtual';
+  buildSlotArea();
+  renderFan();
+  updateProg();
+  document.getElementById('nextBtn').classList.remove('ready');
+  // 항상 가상 카드 모드로 시작 (setCardMode가 UI 전체 동기화)
+  setCardMode('virtual');
+
+  if (isGungHap) {
+    setGungHapHint();
+  } else {
+    document.getElementById('hint').textContent = `✦ 마음이 이끄는 카드를 ${pickCount}장 골라주세요 ✦`;
+  }
+  showScreen('screen-cards');
+}
+
+function ghName(who) {
+  // who: 'my' | 'partner'
+  const raw = document.getElementById(who === 'my' ? 'myName' : 'partnerName')?.value.trim() || '';
+  if (!raw) return who === 'my' ? '나' : '상대방';
+  return `${raw}님`;
+}
+
+function setGungHapHint() {
+  const cfg = GH_STAGES[gungHapStage - 1];
+  const stageStart = ghStageStart(gungHapStage);
+  const left = cfg.count - (picked.length - stageStart);
+  let label = cfg.label;
+  if (gungHapStage === 1) label = `${ghName('my')}의 카드`;
+  if (gungHapStage === 2) label = `${ghName('partner')}의 카드`;
+  document.getElementById('hint').textContent =
+    `✦ [${gungHapStage}단계] ${label} ${left}장을 골라주세요 ✦`;
+}
+
+async function advanceGungHapStage() {
+  // 1. 카드 모으기 애니메이션
+  document.querySelectorAll('.fan-card').forEach(c => c.classList.add('gathering'));
+  showToast('카드를 다시 섞고 있습니다... 🔀', 1000);
+  await new Promise(r => setTimeout(r, 650));
+
+  // 2. 다음 단계로 — DOM 완전 초기화 후 새 덱 렌더
+  gungHapStage++;
+  deck = shuffle([...CARDS]);
+  const container = document.getElementById('fan-container');
+  if (container) container.innerHTML = ''; // 이전 카드 완전 제거
+  if (cardMode === 'virtual') renderFan();
+
+  // 3. 단계별 안내 메시지
+  if (gungHapStage === 2) {
+    document.getElementById('hint').textContent =
+      `✦ 카드를 다시 섞었습니다. [2단계] ${ghName('partner')}의 카드 3장을 골라주세요 ✦`;
+  } else if (gungHapStage === 3) {
+    document.getElementById('hint').textContent =
+      `✦ 카드를 다시 섞었습니다. [3단계] 두 분의 관계를 위한 카드 2장을 골라주세요 ✦`;
+  }
+  updateProg();
+}
+
+/* ─── 카드 모드 전환 ─── */
+function setCardMode(mode) {
+  cardMode = mode;
+  const isVirtual = mode === 'virtual';
+
+  // 탭 active
+  document.getElementById('tab-virtual').classList.toggle('active', isVirtual);
+  document.getElementById('tab-real').classList.toggle('active', !isVirtual);
+
+  // 영역 표시 (real 전환 시 fan DOM 완전 초기화)
+  const va = document.getElementById('virtual-card-area');
+  const ra = document.getElementById('real-card-area');
+  if (isVirtual) {
+    va.style.removeProperty('display');
+    va.style.pointerEvents = '';
+    ra.style.setProperty('display', 'none', 'important');
+  } else {
+    va.style.setProperty('display', 'none', 'important');
+    va.style.pointerEvents = 'none';
+    ra.style.setProperty('display', 'block', 'important');
+    // fan 카드 DOM 제거 — 화면에 남지 않도록
+    const fc = document.getElementById('fan-container');
+    if (fc) fc.innerHTML = '';
+    // 카운트 레이블 업데이트
+    const lbl = document.getElementById('realCardCountLabel');
+    if (lbl) lbl.textContent = `${pickCount}장`;
+    document.getElementById('cardSearch').value = '';
+    filterCards('');
+    setTimeout(() => document.getElementById('cardSearch').focus(), 80);
+  }
+
+  // 모드 뱃지 업데이트
+  const badge = document.getElementById('modeBadge');
+  if (badge) {
+    badge.textContent = isVirtual ? '🎴 가상 카드 모드' : '🃏 실물 카드 모드';
+    badge.className   = 'mode-badge' + (isVirtual ? '' : ' real');
+  }
+
+  // 셔플 버튼 텍스트 분기
+  const reshuffleBtn = document.getElementById('reshuffleBtn');
+  if (reshuffleBtn) {
+    reshuffleBtn.textContent = isVirtual ? '↩ 카드 다시 섞기' : '↩ 선택 초기화';
+  }
+}
+
+/* ─── 실물카드 검색 ─── */
+function filterCards(query) {
+  const q       = (query || '').trim().toLowerCase();
+  const usedIds = new Set(picked.map(p => p.card.id));
+  const results = q
+    ? CARDS.filter(c =>
+        c.name.toLowerCase().includes(q) ||
+        c.en.toLowerCase().includes(q) ||
+        c.id.toLowerCase().includes(q))
+    : [...CARDS];
+
+  const container = document.getElementById('searchResults');
+  if (!results.length) {
+    container.innerHTML = `<div class="search-empty">검색 결과가 없습니다</div>`;
+    return;
+  }
+  container.innerHTML = '';
+  results.forEach(card => {
+    const used = usedIds.has(card.id);
+    const item = document.createElement('div');
+    item.className = 'search-item' + (used ? ' used' : '');
+
+    const thumb = document.createElement('img');
+    thumb.className = 'search-thumb';
+    thumb.alt = card.name;
+    thumb.loading = 'lazy';
+    thumb.src = `${CDN}${card.img}`;
+    thumb.onerror = function() {
+      this.style.display = 'none';
+    };
+
+    const info = document.createElement('div');
+    info.className = 'search-info';
+    info.innerHTML = `<div class="search-name">${card.name}</div><div class="search-en">${card.en}</div>`;
+
+    const badge = document.createElement('span');
+    badge.style.cssText = `font-size:.72rem;color:${used ? 'var(--dim)' : 'var(--gold)'};white-space:nowrap;`;
+    badge.textContent = used ? '선택됨' : '선택 ›';
+
+    item.appendChild(thumb);
+    item.appendChild(info);
+    item.appendChild(badge);
+    if (!used) item.addEventListener('click', () => pickRealCard(card));
+    container.appendChild(item);
+  });
+}
+
+function pickRealCard(card) {
+  if (picked.length >= pickCount) return;
+  if (dirMode === 'both') {
+    showRealCardDirPopup(card, (reversed) => _commitRealCard(card, reversed));
+  } else {
+    _commitRealCard(card, false);
+  }
+}
+
+function _commitRealCard(card, reversed) {
+  picked.push({ card, reversed });
+  renderSlots();
+  updateProg();
+  filterCards(document.getElementById('cardSearch').value);
+
+  const left = pickCount - picked.length;
+  if (left > 0) {
+    document.getElementById('hint').textContent = `✦ ${left}장 더 선택해주세요 ✦`;
+  } else {
+    document.getElementById('hint').textContent = `✦ ${pickCount}장이 선택되었습니다. 리딩을 시작하세요 ✦`;
+    document.getElementById('nextBtn').classList.add('ready');
+  }
+}
+
+/* ─── 방향 선택 팝업 ─── */
+function showRealCardDirPopup(card, callback) {
+  const prev = document.getElementById('dirPopupOverlay');
+  if (prev) prev.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'dirPopupOverlay';
+  overlay.innerHTML = `
+    <div class="dir-popup-inner">
+      <div class="dir-popup-title">${esc(card.name)}</div>
+      <div class="dir-popup-sub">${esc(card.en)}</div>
+      <img class="dir-popup-img" id="dirPopupImg"
+           src="${CDN}${card.img}" alt="${card.name}"
+           onerror="this.style.opacity='0'">
+      <div class="dir-popup-btns">
+        <button class="dir-popup-btn up" id="dirBtnUp">↑ 정방향</button>
+        <button class="dir-popup-btn rev" id="dirBtnRev">↓ 역방향</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const img = overlay.querySelector('#dirPopupImg');
+  const btnRev = overlay.querySelector('#dirBtnRev');
+  btnRev.addEventListener('mouseenter', () => img.classList.add('rev'));
+  btnRev.addEventListener('mouseleave', () => img.classList.remove('rev'));
+  overlay.querySelector('#dirBtnUp').addEventListener('click', () => {
+    overlay.remove(); callback(false);
+  });
+  btnRev.addEventListener('click', () => {
+    overlay.remove(); callback(true);
+  });
+}
+
+function goBack() { showScreen('screen-setup'); }
+
+/* ─── 심층 실물카드 검색 ─── */
+function renderDeepSlots() {
+  for (let i = 0; i < 2; i++) {
+    const slot = document.querySelector(`#deepSlotRow .sel-slot[data-deep-i="${i}"]`);
+    if (!slot) continue;
+    const p = deepPicked[i];
+    if (p) {
+      slot.classList.add('filled');
+      slot.innerHTML = `<img src="${CDN}${p.card.img}" alt="${p.card.name}" loading="lazy"
+        style="width:100%;height:100%;object-fit:cover;display:block;"
+        onerror="this.outerHTML='<span style=\\'font-size:.52rem;text-align:center;padding:3px;line-height:1.3;color:var(--gld-l);font-weight:700;\\'>${p.card.name}</span>'">`;
+    } else {
+      slot.classList.remove('filled');
+      slot.textContent = i + 1;
+    }
+  }
+}
+
+function filterDeepCards(query) {
+  const q       = (query || '').trim().toLowerCase();
+  const usedIds = new Set([...picked, ...deepPicked].map(p => p.card.id));
+  const results = q
+    ? CARDS.filter(c =>
+        c.name.toLowerCase().includes(q) ||
+        c.en.toLowerCase().includes(q) ||
+        c.id.toLowerCase().includes(q))
+    : [...CARDS];
+
+  const container = document.getElementById('deepSearchResults');
+  if (!results.length) {
+    container.innerHTML = `<div class="search-empty">검색 결과가 없습니다</div>`;
+    return;
+  }
+  container.innerHTML = '';
+  results.forEach(card => {
+    const used = usedIds.has(card.id);
+    const item = document.createElement('div');
+    item.className = 'search-item' + (used ? ' used' : '');
+
+    const thumb = document.createElement('img');
+    thumb.className = 'search-thumb';
+    thumb.alt = card.name;
+    thumb.loading = 'lazy';
+    thumb.src = `${CDN}${card.img}`;
+    thumb.onerror = function() { this.style.display = 'none'; };
+
+    const info = document.createElement('div');
+    info.className = 'search-info';
+    info.innerHTML = `<div class="search-name">${esc(card.name)}</div><div class="search-en">${esc(card.en)}</div>`;
+
+    const badge = document.createElement('span');
+    badge.style.cssText = `font-size:.72rem;color:${used ? 'var(--dim)' : 'var(--gold)'};white-space:nowrap;`;
+    badge.textContent = used ? '선택됨' : '선택 ›';
+
+    item.appendChild(thumb);
+    item.appendChild(info);
+    item.appendChild(badge);
+    if (!used) item.addEventListener('click', () => pickDeepRealCard(card));
+    container.appendChild(item);
+  });
+}
+
+function pickDeepRealCard(card) {
+  if (deepPicked.length >= 2) return;
+  if (dirMode === 'both') {
+    showRealCardDirPopup(card, (reversed) => _commitDeepRealCard(card, reversed));
+  } else {
+    _commitDeepRealCard(card, false);
+  }
+}
+
+function _commitDeepRealCard(card, reversed) {
+  deepPicked.push({ card, reversed });
+  renderDeepSlots();
+  filterDeepCards(document.getElementById('deepCardSearch').value);
+
+  const left = 2 - deepPicked.length;
+  if (left > 0) {
+    document.getElementById('deepHint').textContent = `✦ ${left}장 더 선택해주세요 ✦`;
+  } else {
+    document.getElementById('deepHint').textContent = `✦ 베테랑이 카드를 읽고 있습니다... ✦`;
+    setTimeout(() => finalizeDeepAnalysis(), 500);
+  }
+}
+
+/* ─── 셔플 ─── */
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function reshuffleCards() {
+  if (cardMode === 'real') {
+    // 실물 모드: 선택 초기화만
+    picked = [];
+    renderSlots();
+    updateProg();
+    document.getElementById('nextBtn').classList.remove('ready');
+    document.getElementById('cardSearch').value = '';
+    filterCards('');
+    document.getElementById('hint').textContent = `✦ 마음이 이끄는 카드를 ${pickCount}장 골라주세요 ✦`;
+  } else {
+    // 가상 모드: 팬 모으기 후 재셔플
+    document.querySelectorAll('.fan-card').forEach(c => c.classList.add('gathering'));
+    setTimeout(() => goToCards(), 420);
+  }
+}
+
+/* ─── 슬롯 영역 빌드 (동적) ─── */
+function buildSlotArea() {
+  const area = document.getElementById('slotArea');
+  area.innerHTML = '';
+  const pos = getPositions();
+
+  if (isGungHap) {
+    // 궁합: 3 그룹으로 나눠서 렌더
+    const groups = {};
+    pos.forEach((p, i) => {
+      const g = p.group || '기타';
+      if (!groups[g]) groups[g] = [];
+      groups[g].push({ ...p, idx: i });
+    });
+
+    Object.entries(groups).forEach(([gname, items]) => {
+      const gDiv = document.createElement('div');
+      gDiv.className = 'slot-group';
+      gDiv.innerHTML = `<div class="slot-group-label">✦ ${gname}</div>`;
+
+      const labelsDiv = document.createElement('div');
+      labelsDiv.className = 'slot-labels';
+      const rowDiv = document.createElement('div');
+      rowDiv.className = 'selected-row';
+
+      items.forEach(p => {
+        const lbl = document.createElement('span');
+        lbl.className = 'slot-label-text';
+        lbl.dataset.i = p.idx;
+        lbl.textContent = p.label;
+        labelsDiv.appendChild(lbl);
+
+        const slot = document.createElement('div');
+        slot.className = 'sel-slot';
+        slot.dataset.i = p.idx;
+        slot.textContent = p.idx + 1;
+        rowDiv.appendChild(slot);
+      });
+
+      gDiv.appendChild(labelsDiv);
+      gDiv.appendChild(rowDiv);
+      area.appendChild(gDiv);
+    });
+  } else {
+    // 일반: 단일 행
+    const labelsDiv = document.createElement('div');
+    labelsDiv.className = 'slot-labels';
+    const rowDiv = document.createElement('div');
+    rowDiv.className = 'selected-row';
+
+    pos.forEach((p, i) => {
+      const lbl = document.createElement('span');
+      lbl.className = 'slot-label-text';
+      lbl.dataset.i = i;
+      lbl.textContent = p.label;
+      labelsDiv.appendChild(lbl);
+
+      const slot = document.createElement('div');
+      slot.className = 'sel-slot';
+      slot.dataset.i = i;
+      slot.textContent = i + 1;
+      rowDiv.appendChild(slot);
+    });
+
+    area.appendChild(labelsDiv);
+    area.appendChild(rowDiv);
+  }
+
+  // 프로그레스 도트 빌드
+  const dots = document.getElementById('progDots');
+  dots.innerHTML = '';
+  for (let i = 0; i < pickCount; i++) {
+    const d = document.createElement('div');
+    d.className = 'prog-dot';
+    dots.appendChild(d);
+  }
+}
+
+/* ─── 부채꼴 팬 ─── */
+function renderFan() {
+  const container = document.getElementById('fan-container');
+  container.innerHTML = '';
+  const total = deck.length; // 78
+  // 궁합: 현재 단계에서 뽑은 카드만 used 처리 (이전 단계 카드는 새 덱에서 fresh)
+  const stagePicks = isGungHap ? picked.slice(ghStageStart(gungHapStage)) : picked;
+  const usedIds = new Set(stagePicks.map(p => p.card.id));
+
+  deck.forEach((card, i) => {
+    const isUsed = usedIds.has(card.id);
+    const wrap = document.createElement('div');
+    wrap.className = 'fan-card' + (isUsed ? ' flipped picked' : '');
+    wrap.innerHTML = `
+      <div class="card-inner">
+        <div class="card-face card-back"></div>
+        <div class="card-face card-front">
+          <img src="${CDN}${card.img}" alt="${card.name}" loading="lazy"
+               onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="card-front-fallback">
+            <div class="card-front-name">${card.name}</div>
+            <div class="card-front-en">${card.en}</div>
+          </div>
+        </div>
+      </div>`;
+    if (!isUsed) wrap.addEventListener('click', () => pickCard(i, wrap, card));
+    container.appendChild(wrap);
+  });
+}
+
+function renderSlots() {
+  const pos = getPositions();
+  for (let i = 0; i < pickCount; i++) {
+    const slot = document.querySelector(`.sel-slot[data-i="${i}"]`);
+    const lbl  = document.querySelector(`.slot-label-text[data-i="${i}"]`);
+    if (!slot) continue;
+    const p = picked[i];
+    if (p) {
+      slot.classList.add('filled');
+      const dirColor = p.reversed ? 'var(--rose)' : 'var(--pur-l)';
+      const dirText  = p.reversed ? '역방향' : '정방향';
+      slot.innerHTML = `
+        <img src="${CDN}${p.card.img}" alt="${p.card.name}" loading="lazy"
+          style="width:100%;height:100%;object-fit:cover;display:block;"
+          onerror="this.style.opacity='0'">
+        <div class="slot-dir-badge" style="color:${dirColor};">${dirText}</div>`;
+      if (lbl) {
+        lbl.style.fontSize = '.5rem';
+        lbl.style.letterSpacing = '0';
+        lbl.innerHTML = `<span style="color:var(--gld-l);">${p.card.name}</span><br><span style="color:${dirColor};">(${dirText})</span>`;
+      }
+    } else {
+      slot.classList.remove('filled');
+      slot.textContent = i + 1;
+      if (lbl) {
+        lbl.style.fontSize = '';
+        lbl.style.letterSpacing = '';
+        lbl.textContent = pos[i]?.label || '';
+      }
+    }
+  }
+}
+
+function pickCard(i, el, card) {
+  if (el.classList.contains('picked')) return;
+  if (picked.length >= pickCount) return;
+
+  el.classList.add('flipped');
+  const reversed = dirMode === 'both' && Math.random() < 0.5;
+
+  setTimeout(() => {
+    el.classList.add('picked');
+    picked.push({ card, reversed });
+    renderSlots();
+    updateProg();
+
+    if (isGungHap) {
+      const cfg = GH_STAGES[gungHapStage - 1];
+      const stageStart = ghStageStart(gungHapStage);
+      const stageCount = picked.length - stageStart;
+
+      if (stageCount < cfg.count) {
+        // 현재 단계 진행 중
+        setGungHapHint();
+      } else if (gungHapStage < GH_STAGES.length) {
+        // 단계 완료 → 다음 단계로 자동 전환
+        advanceGungHapStage();
+      } else {
+        // 모든 단계 완료
+        document.getElementById('hint').textContent = `✦ 모든 카드가 선택되었습니다! 리딩을 시작하세요 ✦`;
+        document.getElementById('nextBtn').classList.add('ready');
+      }
+    } else {
+      const left = pickCount - picked.length;
+      if (left > 0) {
+        document.getElementById('hint').textContent = `✦ ${left}장 더 선택해주세요 ✦`;
+      } else {
+        document.getElementById('hint').textContent = `✦ ${pickCount}장이 선택되었습니다. 리딩을 시작하세요 ✦`;
+        document.getElementById('nextBtn').classList.add('ready');
+      }
+    }
+  }, 380);
+}
+
+function updateProg() {
+  document.getElementById('progCount').textContent = `${picked.length} / ${pickCount}`;
+  document.querySelectorAll('.prog-dot').forEach((d, i) => d.classList.toggle('done', i < picked.length));
+}
+
+/* ─── 사주 계산 ─── */
+const CG     = ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸'];
+const CG_KO  = ['갑','을','병','정','무','기','경','신','임','계'];
+const CG_EL  = ['목','목','화','화','토','토','금','금','수','수'];
+const JJ     = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
+const JJ_KO  = ['자','축','인','묘','진','사','오','미','신','유','술','해'];
+const JJ_AN  = ['쥐','소','호랑이','토끼','용','뱀','말','양','원숭이','닭','개','돼지'];
+const JJ_EL  = ['수','토','목','목','토','화','화','토','금','금','토','수'];
+const ELEMS  = ['목','화','토','금','수'];
+
+function pillar(si, bi, lbl) {
+  return { lbl, stem:CG[si], stemKo:CG_KO[si], stemEl:CG_EL[si], si,
+           branch:JJ[bi], branchKo:JJ_KO[bi], animal:JJ_AN[bi], branchEl:JJ_EL[bi] };
+}
+function yearPillar(y)    { return pillar(((y-4)%10+10)%10, ((y-4)%12+12)%12, '년주'); }
+function monthPillar(y,m) {
+  const bi   = m % 12;
+  const base = [2,4,6,8,0][(((y-4)%10+10)%10)%5];
+  return pillar((base+(bi-2+12)%12)%10, bi, '월주');
+}
+function dayPillar(y,m,d) {
+  const diff = Math.round((new Date(y,m-1,d) - new Date(1900,0,1)) / 86400000);
+  return pillar(((2+diff)%10+10)%10, ((8+diff)%12+12)%12, '일주');
+}
+function hourPillar(h, dSi) {
+  const bi = h === 23 ? 0 : Math.floor((h+1)/2) % 12;
+  return pillar(([0,2,4,6,8][dSi%5]+bi)%10, bi, '시주');
+}
+
+function calcSajuFrom({ dateVal, hourVal, name, gender }) {
+  if (!dateVal) return null;
+  const [y,m,d] = dateVal.split('-').map(Number);
+  const hNum    = hourVal === '' || hourVal == null ? null : +hourVal;
+  const yp = yearPillar(y), mp = monthPillar(y,m), dp = dayPillar(y,m,d);
+  const hp = hNum !== null ? hourPillar(hNum, dp.si) : null;
+  const pillars = [yp,mp,dp,hp];
+  const elems = {목:0,화:0,토:0,금:0,수:0};
+  pillars.filter(Boolean).forEach(p => { elems[p.stemEl]++; elems[p.branchEl]++; });
+  const sorted = Object.entries(elems).sort((a,b) => a[1] - b[1]);
+  const strong = sorted[4][0], weak = sorted[0][0];
+  const ctrl = {목:'토',화:'금',토:'수',금:'목',수:'화'};
+  const yongsin = sorted[4][1] >= 4
+    ? `용신: ${ctrl[strong]} — ${strong} 기운이 강하여 ${ctrl[strong]}로 균형`
+    : sorted[0][1] === 0
+      ? `용신: ${weak} — 사주에 ${weak} 기운 없음, 보충 필요`
+      : `용신: ${weak} — ${weak} 기운이 가장 약함`;
+  return { name, gender, date:{y,m,d}, hour:hNum,
+           pillars:{year:yp,month:mp,day:dp,hour:hp}, elems, yongsin };
+}
+
+function calcSaju() {
+  return calcSajuFrom({
+    dateVal: document.getElementById('sajuDate').value,
+    hourVal: document.getElementById('sajuHour').value,
+    name:    document.getElementById('sajuName').value.trim(),
+    gender:  myGender,
+  });
+}
+
+function calcGungHapSaju() {
+  const my = calcSajuFrom({
+    dateVal: document.getElementById('myDate').value,
+    hourVal: document.getElementById('myHour').value,
+    name:    document.getElementById('myName').value.trim(),
+    gender:  myGender,
+  });
+  const partner = calcSajuFrom({
+    dateVal: document.getElementById('partnerDate').value,
+    hourVal: document.getElementById('partnerHour').value,
+    name:    document.getElementById('partnerName').value.trim(),
+    gender:  partnerGender,
+  });
+  return { my, partner };
+}
+
+function sajuToText(saju, label) {
+  if (!saju) return '';
+  const {name,gender,date,hour,pillars:{year:yp,month:mp,day:dp,hour:hp},elems,yongsin} = saju;
+  const nameStr   = name   ? `이름: ${name}\n` : '';
+  const genderStr = gender ? `성별: ${gender}성\n` : '';
+  const dateStr   = `${date.y}년 ${date.m}월 ${date.d}일${hour!==null?' '+hour+'시':' (시간 모름)'}`;
+  const pStr      = [
+    `년주:${yp.stem}${yp.branch}`,
+    `월주:${mp.stem}${mp.branch}`,
+    `일주:${dp.stem}${dp.branch}`,
+    hp ? `시주:${hp.stem}${hp.branch}` : '시주:미상',
+  ].join(' / ');
+  const eStr = ELEMS.map(e=>`${e}:${elems[e]}`).join(' ');
+  return `\n**${label} 사주:**\n${nameStr}${genderStr}생년월일: ${dateStr}\n사주팔자: ${pStr}\n오행: ${eStr}\n일간: ${dp.stem}(${dp.stemKo}) ${dp.stemEl} / 띠: ${yp.animal}띠 — ${label}은(는) ${dp.stem}일간으로...\n${yongsin}\n`;
+}
+
+/* ─── 프롬프트 생성 ─── */
+function buildPrompt(sajuData) {
+  const worry    = document.getElementById('worryInput').value.trim();
+  const catFocus = catInfo ? catInfo.focus : '전반적 상황';
+  const pos      = getPositions();
+
+  if (isGungHap) {
+    return buildGungHapPrompt(worry, catFocus, pos, sajuData);
+  }
+
+  const hasSaju  = !!(sajuData && readingMode === 'saju' && sajuData.pillars);
+  const userName = sajuData?.name ? `${sajuData.name}님` : '의뢰인';
+  const sajuText = hasSaju ? sajuToText(sajuData, userName) : '';
+
+  const cardLines = picked.map(({card, reversed}, i) =>
+    `${i+1}. [${pos[i]?.label || ''}] ${card.name} (${card.en}) — ${reversed?'역방향':'정방향'}`
+  ).join('\n');
+
+  // 오행별 개운법 데이터 (색상·숫자·장소·시간·습관)
+  const ELEM_GAEUN = {
+    '목': { color:'초록색·파란색·청록색', number:'3·8', place:'공원·숲·강변·나무 많은 카페', time:'이른 아침 (새벽 3~7시, 寅시·卯시)', habit:'이른 아침 산책, 식물 키우기, 독서, 새로운 것 배우기, 스트레칭' },
+    '화': { color:'빨간색·주황색·자주색·분홍색', number:'2·7', place:'활기찬 카페·야외 테라스·공연장·시장', time:'한낮 (오전 9시~오후 1시, 巳시·午시)', habit:'사람들과 활발히 교류하기, 유산소 운동, 창의적 취미, 촛불 켜두기' },
+    '토': { color:'노란색·황토색·베이지색·갈색', number:'5·10', place:'황토 흙길·정원·도자기 공방·산 중턱', time:'오후 (오후 1~3시·저녁 7~9시, 未시·戌시)', habit:'규칙적인 생활 루틴, 요리하기, 맨발 걷기, 명상, 흙 만지기' },
+    '금': { color:'흰색·금색·은색·회색', number:'4·9', place:'도서관·미술관·사원·높은 건물 전망대', time:'늦은 오후 (오후 3~7시, 申시·酉시)', habit:'정리정돈, 계획 세우기, 금속·보석 소품 착용, 클래식 음악 듣기' },
+    '수': { color:'검정색·남색·진파랑·보라색', number:'1·6', place:'바닷가·강가·호수·조용한 찻집·수영장', time:'밤 (밤 9시~새벽 1시, 亥시·子시)', habit:'물가 산책, 명상, 일기 쓰기, 충분한 수면, 목욕·족욕' },
+  };
+
+  // 부족한 오행 계산
+  let weakElem = '', gaeun = null;
+  if (hasSaju) {
+    const sorted = Object.entries(sajuData.elems).sort((a, b) => a[1] - b[1]);
+    weakElem = sorted[0][0];
+    gaeun    = ELEM_GAEUN[weakElem] || null;
+  }
+
+  const elemDistStr = hasSaju
+    ? Object.entries(sajuData.elems).map(([k, v]) => `${k}:${v}개`).join(', ')
+    : '';
+
+  const posLabels = pos.map(p => p.label).join(', ');
+
+  return `당신은 타로${hasSaju ? '+사주명리를 함께 읽는' : '를 깊이 읽는'} 베테랑 상담가입니다.
+
+**리딩 원칙:** 각 카드의 라이더-웨이트 도상(인물·색상·물건·배경·동물·꽃 등 구체적 상징)을 분석해 고민과 연결하세요. 중요 키워드는 **굵은 글씨**로, 역방향도 희망적으로, 한자는 한글로 풀어 쓰세요.
+
+**절대 금지:** 솔루션, 체크리스트, 구체적 행동 지침(기상 시간, 산책, SNS 차단, 특정 시간대 행동 등 일정·루틴 형태의 지시)은 어떤 형식으로도 작성하지 마세요.
+
+**카테고리:** ${category} (${catFocus})
+**고민:** ${worry}
+${sajuText}**선택 카드 (${pickCount}장):**
+${cardLines}
+
+각 섹션은 반드시 【】로 시작하세요:
+
+${hasSaju ? `【본원의 기운 — ${userName}이 타고난 별자리】
+${userName}의 일간은 **${sajuData.pillars.day.stem}(${sajuData.pillars.day.stemKo})**, **${sajuData.pillars.day.stemEl}** 기운입니다.
+• **타고난 본성:** 성격·기질·강점과 다듬으면 좋을 면을 생생하게 서술하세요.
+• **오행 균형 (${elemDistStr}):** 가장 부족한 **${weakElem}** 기운이 삶에 어떻게 나타나는지 설명하세요.
+• **개운법 — ${weakElem} 보충:** 행운색(${gaeun?.color || ''}), 숫자(${gaeun?.number || ''}), 장소(${gaeun?.place || ''})를 오행 원리와 함께 안내하세요. 행동 지침이나 루틴 형태는 쓰지 마세요.
+• **용신:** ${sajuData.yongsin} — 활용법을 쉽게 설명하세요.
+` : ''}【심층 카드 상징 분석 — 별이 그린 오늘의 그림】
+각 카드를 아래 형식으로 작성하세요:
+◆ [순번]. [위치명] 카드명 (정방향/역방향)
+#키워드1 #키워드2 #키워드3 #키워드4 #키워드5
+
+**[도상 풀이]** 인물·색상·물건·배경·동물·꽃 등 구체적 상징을 짚고, 각 상징이 "${worry}"와 어떻게 맞닿는지 연결하세요.
+**[위치·메시지]** 이 카드가 해당 위치에서 고민에 어떻게 답하는지 깊이 풀어주세요.${hasSaju ? `
+**[일간 연결]** ${userName}의 ${sajuData.pillars.day.stem}일간(${sajuData.pillars.day.stemEl})과 이 카드가 어떻게 어우러지는지 분석하세요.` : ''}
+
+${hasSaju ? `【사주와 타로의 운명적 연결 — 두 세계가 만나는 지점】
+사주 기운과 오늘 카드들을 하나의 이야기로 연결하세요: ①사주가 가리키는 방향 → ②카드의 전체 메시지 → ③두 세계의 교차점 → ④상생·보완·경고 관계.` : `【카드들의 운명적 이야기 — 전체 흐름】
+카드들을 하나의 이야기로 엮어 전체 흐름이 무엇을 말하는지 풀어주세요.`}
+
+따뜻하고 희망찬 응원 메시지로 마무리하세요.`;
+}
+
+function buildGungHapPrompt(worry, catFocus, pos, sajuData) {
+  const myCards      = picked.slice(0, 3);
+  const partnerCards = picked.slice(3, 6);
+  const relCards     = picked.slice(6, 8);
+
+  const myName      = ghName('my');
+  const partnerName = ghName('partner');
+
+  const myText      = sajuData?.my      ? sajuToText(sajuData.my,      myName)      : '';
+  const partnerText = sajuData?.partner ? sajuToText(sajuData.partner,  partnerName) : '';
+
+  const cardRow = ({card, reversed}, i, startPos) =>
+    `${i+1}. [${pos[startPos+i]?.label || ''}] ${card.name} (${card.en}) — ${reversed?'역방향':'정방향'}`;
+
+  const myLines      = myCards.map((c,i)      => cardRow(c,i,0)).join('\n');
+  const partnerLines = partnerCards.map((c,i) => cardRow(c,i,3)).join('\n');
+  const relLines     = relCards.map((c,i)     => cardRow(c,i,6)).join('\n');
+
+  const hasSaju = !!(sajuData?.my || sajuData?.partner);
+  return `당신은 타로${hasSaju ? '+사주명리를 함께 읽는' : '를 깊이 읽는'} 베테랑 궁합 상담가입니다.
+
+**리딩 원칙:** 각 카드의 도상(인물·색상·물건·배경·동물·꽃)을 분석해 두 사람 관계와 연결하세요. 중요 키워드는 **굵은 글씨**로, 이름 뒤에는 반드시 '님'을 붙이고, 한자는 한글로 풀어 쓰세요.
+
+**절대 금지:** 솔루션, 체크리스트, 구체적 행동 지침(기상 시간, 산책, SNS 차단, 특정 시간대 행동 등 일정·루틴 형태의 지시)은 어떤 형식으로도 작성하지 마세요.
+
+**카테고리:** 궁합 (${catFocus})
+**질문:** ${worry}
+${myText}${partnerText}**[1단계] ${myName}의 카드 (3장):**
+${myLines}
+
+**[2단계] ${partnerName}의 카드 (3장):**
+${partnerLines}
+
+**[3단계] 관계 카드 (2장):**
+${relLines}
+
+각 섹션은 반드시 【】로 시작하세요:
+
+【두 사람의 본원 에너지 — 각자가 품은 별빛】
+${hasSaju ? `• **${myName}의 기운:** 사주+카드가 보여주는 에너지·성격·강점을 생생하게 서술하세요.
+• **${partnerName}의 기운:** 사주+카드가 보여주는 에너지·성격·강점을 생생하게 서술하세요.
+• **오행 상생·상극:** 두 사람의 오행이 어떻게 상생·상극하는지, 실제 관계에서 어떻게 나타나는지 분석하세요.` : `두 사람의 카드가 보여주는 각자의 에너지와 성향을 분석하세요.`}
+
+【심층 카드 상징 분석 — 두 사람을 비추는 카드의 그림】
+각 카드를 아래 형식으로 작성하세요:
+◆ [순번]. [위치명] 카드명 (정방향/역방향)
+#키워드1 #키워드2 #키워드3 #키워드4 #키워드5
+**[도상 풀이]** 인물·색상·물건·배경·동물 등 구체적 상징을 짚고 두 사람 관계와 연결하세요.
+**[위치 의미]** 이 카드가 해당 포지션에서 관계에 대해 무엇을 말하는지 설명하세요.
+
+【관계의 강점과 도전 — 빛과 그림자】
+카드 조합${hasSaju ? '과 사주 기운에서' : '에서'} 보이는 **빛나는 강점**과 **성장이 필요한 부분**을 솔직하게, 그러나 희망적으로 분석하세요.
+
+【사주와 타로가 그리는 운명적 연결 — 두 사람이 만난 이유】
+두 사람의 에너지가 왜 이 시점에 만났는지 감동적으로 서술하세요.${hasSaju ? ' 사주 오행 흐름과 타로 메시지를 자연스럽게 엮어주세요.' : ''}
+
+【현재 관계의 흐름과 미래 가능성】
+관계 카드 2장을 중심으로 지금 흐름과 앞으로의 가능성을 분석하세요.
+
+따뜻하고 희망찬 응원의 말로 마무리하세요.`;
+}
+
+/* ─── Claude API ─── */
+// ★ API 키는 코드에 넣지 않습니다. 앱 화면 Box 4 입력창에 직접 입력 후 [저장] 버튼을 누르세요.
+const API_URL = 'https://api.anthropic.com/v1/messages';
+const MODEL   = 'claude-haiku-4-5-20251001';
+
+function getApiKey() {
+  const fixKey = k => k.trim().replace(/^(sk-ant-api03-)sk-ant-api03-/, '$1');
+  // 1순위: 화면 Box 4 입력창 (현재 입력값)
+  const inputEl = document.getElementById('apiKeyInput');
+  const inputKey = fixKey(inputEl ? inputEl.value : '');
+  if (inputKey) return inputKey;
+  // 2순위: localStorage (이전에 [저장] 버튼으로 저장된 키)
+  return fixKey(localStorage.getItem('tarot_v2_key') || '');
+}
+
+async function callAPI(messages, _attempt = 0) {
+  const key = getApiKey();
+  console.log('[API] key prefix:', key ? key.slice(0, 14) + '...' : '(비어있음)');
+  if (!key) throw new Error('API 키를 입력해주세요. Box 4에 sk-ant-... 입력 후 저장 버튼을 누르세요.');
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 180_000); // 180초 타임아웃 (장문 리딩 대응)
+
+  let res;
+  try {
+    res = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({ model: MODEL, max_tokens: 8192, messages }),
+      signal: controller.signal,
+    });
+  } catch (fetchErr) {
+    clearTimeout(timer);
+    if (fetchErr.name === 'AbortError') throw new Error('응답 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.');
+    throw fetchErr;
+  }
+  clearTimeout(timer);
+
+  if (!res.ok) {
+    // 과부하(529) 또는 일시적 오류(500·503) → 사용자에게 알리지 않고 자동 재시도
+    const isOverload = res.status === 529 || res.status === 500 || res.status === 503;
+    if (isOverload && _attempt < 3) {
+      const delay = 2000 + _attempt * 500; // 2.0s → 2.5s → 3.0s
+      console.log(`[API] 과부하 (${res.status}), ${delay/1000}초 후 재시도 (${_attempt + 1}/3)...`);
+      await new Promise(r => setTimeout(r, delay));
+      return callAPI(messages, _attempt + 1);
+    }
+    const err = await res.json().catch(() => ({}));
+    if (res.status === 401) throw new Error('API 키가 유효하지 않습니다. Anthropic 대시보드(console.anthropic.com)에서 키 상태와 결제 잔액을 확인해주세요.');
+    throw new Error(err.error?.message || `API 오류 (${res.status})`);
+  }
+
+  const data = await res.json();
+  return { text: data.content[0].text, stop: data.stop_reason };
+}
+
+/* ─── 리딩 시작 ─── */
+async function startReading() {
+  if (picked.length < pickCount) return;
+  showScreen('screen-loading');
+  startLoadingAnim();
+
+  let sajuData = null;
+  if (isGungHap && readingMode === 'saju') {
+    sajuData = calcGungHapSaju();
+  } else if (!isGungHap && readingMode === 'saju') {
+    sajuData = calcSaju();
+  }
+
+  try {
+    const prompt = buildPrompt(sajuData);
+    const result = await callAPI([{ role: 'user', content: prompt }]);
+    stopLoadingAnim();
+    showResult(sajuData, result.text, result.stop, prompt);
+  } catch (err) {
+    stopLoadingAnim();
+    showResult(sajuData, null, null, null, err.message);
+  }
+}
+
+/* ─── 로딩 애니메이션 ─── */
+const LOAD_MSGS = [
+  '카드의 상징을 해석하는 중...', '별자리의 메시지를 읽고 있어요...',
+  '우주의 에너지를 연결하는 중...', '당신만을 위한 리딩을 준비 중...',
+  '카드들의 이야기를 엮고 있어요...',
+];
+let loadTimer = null;
+function startLoadingAnim() {
+  let i = 0;
+  const el = document.getElementById('loadingMsg');
+  el.textContent = LOAD_MSGS[0];
+  loadTimer = setInterval(() => { el.textContent = LOAD_MSGS[++i % LOAD_MSGS.length]; }, 2200);
+}
+function stopLoadingAnim() { clearInterval(loadTimer); }
+
+/* ─── 결과 화면 ─── */
+function showResult(sajuData, aiText, stopReason, prompt, errMsg) {
+  const worry = document.getElementById('worryInput').value.trim();
+
+  let title = `${category} 타로 리딩 결과`;
+  if (sajuData && !isGungHap && readingMode === 'saju') title = '타로 · 사주 리딩 결과';
+  if (isGungHap) title = '궁합 타로 리딩 결과';
+
+  document.getElementById('resultTitle').textContent = title;
+  document.getElementById('resultWorry').textContent = `"${worry}"`;
+
+  // 심층 분석 상태 초기화
+  deepPicked = []; deepDeck = [];
+  const deepArea = document.getElementById('deepCardArea');
+  deepArea.style.display = 'none';
+  deepArea.innerHTML = `
+    <p class="hint" id="deepHint">✦ 결정적 조언을 위한 카드 2장을 더 골라주세요 ✦</p>
+    <div id="deep-virtual-area">
+      <div class="fan-container" id="deep-fan-container"></div>
+    </div>
+    <div id="deep-real-area" style="display:none;">
+      <p style="font-size:.8rem;color:var(--dim);margin-bottom:10px;line-height:1.6;">
+        실물로 뽑은 카드를 검색해서 선택해주세요. <strong style="color:var(--gld-l)">2장</strong>을 입력하면 심층 분석이 시작됩니다.
+      </p>
+      <div class="slot-labels">
+        <span class="slot-label-text">심층 카드 1</span>
+        <span class="slot-label-text">심층 카드 2</span>
+      </div>
+      <div class="selected-row" id="deepSlotRow">
+        <div class="sel-slot" data-deep-i="0">1</div>
+        <div class="sel-slot" data-deep-i="1">2</div>
+      </div>
+      <input class="search-inp" id="deepCardSearch" placeholder="카드 이름으로 검색 (예: 바보, 태양, Fool…)" oninput="filterDeepCards(this.value)">
+      <div class="search-results" id="deepSearchResults"></div>
+    </div>`;
+
+  // 궁합이 아닌 일반 리딩일 때만 심층 버튼 표시
+  document.getElementById('deepAnalysisBtn').style.display = isGungHap ? 'none' : 'block';
+
+  // 레이아웃 토글 표시/초기화
+  resultLayout = 'row';
+  const lt = document.getElementById('resultLayoutToggle');
+  if (lt) {
+    lt.style.display = (!isGungHap && picked.length > 1) ? 'flex' : 'none';
+    document.getElementById('layoutRowBtn').classList.add('active');
+    document.getElementById('layoutCircleBtn').classList.remove('active');
+  }
+
+  renderResultCards();
+  renderAISection(aiText, stopReason, prompt, errMsg, sajuData);
+  showScreen('screen-result');
+}
+
+function renderResultCards() {
+  const area = document.getElementById('resultCardsArea');
+  area.innerHTML = '';
+  const pos = getPositions();
+
+  if (isGungHap) {
+    // 궁합: 3개 그룹으로 분리 (가로 배치 고정)
+    const groups = [
+      { title: '나의 카드', items: picked.slice(0, 3), posStart: 0 },
+      { title: '상대방의 카드', items: picked.slice(3, 6), posStart: 3 },
+      { title: '관계의 카드', items: picked.slice(6, 8), posStart: 6 },
+    ];
+
+    groups.forEach(({ title, items, posStart }) => {
+      if (!items.length) return;
+      const gDiv = document.createElement('div');
+      gDiv.className = 'result-group';
+      const titleEl = document.createElement('div');
+      titleEl.className = 'result-group-title';
+      titleEl.textContent = `✦ ${title}`;
+      gDiv.appendChild(titleEl);
+
+      const row = document.createElement('div');
+      row.className = 'result-cards-row';
+      items.forEach(({ card, reversed }, i) => {
+        row.appendChild(makeResultCardItem(card, reversed, pos[posStart + i]));
+      });
+      gDiv.appendChild(row);
+      area.appendChild(gDiv);
+    });
+
+  } else if (resultLayout === 'circle' && picked.length > 1) {
+    // 동그라미 배치
+    const N    = picked.length;
+    const size = Math.min(340, (document.documentElement.clientWidth || 375) - 32);
+    const cx   = size / 2, cy = size / 2;
+    const radius = size * 0.37;
+
+    const container = document.createElement('div');
+    container.className = 'result-cards-circular';
+    container.style.cssText = `width:${size}px;height:${size}px;`;
+
+    picked.forEach(({ card, reversed }, i) => {
+      const angle = (i / N) * 2 * Math.PI - Math.PI / 2;
+      const x = cx + radius * Math.cos(angle);
+      const y = cy + radius * Math.sin(angle);
+      const posInfo  = pos[i];
+      const dirColor = reversed ? 'var(--rose)' : 'var(--pur-l)';
+      const dirText  = reversed ? '역방향' : '정방향';
+
+      const el = document.createElement('div');
+      el.className = 'result-card-circular';
+      el.style.cssText = `left:${x}px;top:${y}px;`;
+      el.innerHTML = `
+        <div class="result-card-img${reversed ? ' rev' : ''}">
+          <img src="${CDN}${card.img}" alt="${card.name}" loading="lazy"
+               style="width:100%;height:100%;object-fit:cover;display:block;"
+               onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="card-front-fallback" style="display:none;width:100%;height:100%;flex-direction:column;align-items:center;
+               justify-content:center;text-align:center;padding:4px;gap:2px;
+               background:linear-gradient(160deg,#1a0f40,#2a1a60);border-radius:6px;">
+            <span style="font-size:.6rem;font-weight:700;color:#fde87a;line-height:1.4;">${card.name}</span>
+            <span style="font-size:.48rem;color:#a090c0;line-height:1.3;">${card.en}</span>
+          </div>
+        </div>
+        <span class="result-card-pos">${posInfo?.label || ''}</span>
+        <span class="result-dir-badge ${reversed ? 'rev' : 'up'}" style="font-size:.5rem;">${dirText}</span>`;
+      container.appendChild(el);
+    });
+    area.appendChild(container);
+
+  } else {
+    // 일반 가로 배치
+    const row = document.createElement('div');
+    row.className = 'result-cards-row';
+    row.style.marginBottom = '24px';
+    picked.forEach(({ card, reversed }, i) => {
+      row.appendChild(makeResultCardItem(card, reversed, pos[i]));
+    });
+    area.appendChild(row);
+  }
+}
+
+function makeResultCardItem(card, reversed, posInfo) {
+  const item = document.createElement('div');
+  item.className = 'result-card-item';
+  item.innerHTML = `
+    <div class="result-card-img ${reversed ? 'rev' : ''}">
+      <img src="${CDN}${card.img}" alt="${card.name}" loading="lazy"
+           style="width:100%;height:100%;object-fit:cover;display:block;"
+           onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <div class="card-front-fallback" style="display:none;width:100%;height:100%;flex-direction:column;align-items:center;
+           justify-content:center;text-align:center;padding:6px;gap:4px;
+           background:linear-gradient(160deg,#1a0f40,#2a1a60);border-radius:6px;">
+        <span style="font-size:.75rem;font-weight:700;color:#fde87a;line-height:1.4;">${card.name}</span>
+        <span style="font-size:.58rem;color:#a090c0;line-height:1.3;">${card.en}</span>
+      </div>
+    </div>
+    <span class="result-card-pos">${posInfo?.label || ''}</span>
+    <span class="result-dir-badge ${reversed ? 'rev' : 'up'}">${reversed ? '역방향' : '정방향'}</span>`;
+  return item;
+}
+
+/* ─── AI 응답 파싱 & 렌더 ─── */
+function esc(t) { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function renderHashtagLine(line) {
+  const tags = line.trim().split(/\s+/).filter(t => t.startsWith('#'));
+  if (!tags.length) return null;
+  return `<div class="card-tags">${tags.map(t => `<span class="card-tag">${esc(t)}</span>`).join('')}</div>`;
+}
+
+/* 텍스트 바디 → HTML (볼드 + 태그 처리) */
+function renderBodyLines(body) {
+  const lines = body.split('\n');
+  let html = '';
+  let buf  = [];
+  const flush = () => {
+    if (!buf.length) return;
+    const t = esc(buf.join('\n')).trim();
+    if (t) html += `<span>${t.replace(/\n\n/g,'</span><br><br><span>').replace(/\n/g,'<br>').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')}</span>`;
+    buf = [];
+  };
+  lines.forEach(line => {
+    const tagHtml = renderHashtagLine(line);
+    if (tagHtml) { flush(); html += tagHtml; } else { buf.push(line); }
+  });
+  flush();
+  return html;
+}
+
+/* 카드별 서브박스 파싱 (◆ 기호로 분리) — 항상 열림 */
+function parseCardSection(body) {
+  const chunks = body.split(/(?=◆)/);
+  let html = '';
+  chunks.forEach(chunk => {
+    chunk = chunk.trim();
+    if (!chunk) return;
+    const firstNewline = chunk.indexOf('\n');
+    const header  = firstNewline > -1 ? chunk.slice(0, firstNewline).trim() : chunk;
+    const content = firstNewline > -1 ? chunk.slice(firstNewline + 1).trim() : '';
+    html += `<div class="card-sub-box">
+      <div class="card-sub-header">${esc(header)}</div>
+      ${content ? `<div class="card-sub-body">${renderBodyLines(content)}</div>` : ''}
+    </div>`;
+  });
+  return html
+    ? `<div class="ai-section-body" style="padding-bottom:6px;">${html}</div>`
+    : `<div class="ai-section-body">${renderBodyLines(body)}</div>`;
+}
+
+function parseAndRender(text) {
+  const parts = text.split(/【(.+?)】/);
+  let html = '';
+  for (let i = 1; i < parts.length; i += 2) {
+    const title = parts[i]?.trim();
+    const body  = (parts[i+1] || '').trim();
+    if (!title) continue;
+    const hasCards = /◆/.test(body);
+    const bodyContent = hasCards
+      ? parseCardSection(body)
+      : `<div class="ai-section-body">${renderBodyLines(body)}</div>`;
+    html += `<div class="ai-section">
+      <div class="ai-section-title">✦ ${esc(title)}</div>
+      ${bodyContent}
+    </div>`;
+  }
+  return html || `<div class="ai-section"><div class="ai-section-body">${renderBodyLines(text)}</div></div>`;
+}
+
+function renderAISection(aiText, stopReason, prompt, errMsg) {
+  const wrap = document.getElementById('aiWrap');
+  wrap.innerHTML = '';
+  continuation = null;
+
+  if (errMsg) {
+    wrap.innerHTML = `<div class="err-box">⚠ AI 리딩 오류: ${esc(errMsg)}<br><button onclick="retryReading()">다시 시도하기</button></div>`;
+    return;
+  }
+
+  if (!aiText) {
+    wrap.innerHTML = `<div class="ai-section"><div class="ai-section-body">✦ 기본 리딩<br>${getBasicReading()}</div></div>`;
+    return;
+  }
+
+  wrap.innerHTML = parseAndRender(aiText);
+  continuation = { prompt, accumulated: aiText };
+
+  if (stopReason === 'max_tokens') {
+    const cw = document.createElement('div');
+    cw.className = 'continue-wrap';
+    cw.innerHTML = `<p class="continue-note">✂ 응답이 길어 중간에 끊겼습니다.</p><button class="continue-btn" onclick="continueRead()">▶ 계속 보기</button>`;
+    wrap.appendChild(cw);
+  }
+}
+
+async function continueRead() {
+  if (!continuation) return;
+  const wrap = document.getElementById('aiWrap');
+
+  // 이어받기 버튼 → 스피너로 교체 (DOM 참조 유지)
+  let cw = wrap.querySelector('.continue-wrap');
+  if (cw) {
+    cw.innerHTML = `<div class="continue-loading"><div class="mini-spin"></div><span>리딩을 이어받는 중입니다... 잠시만 기다려주세요</span></div>`;
+  }
+
+  try {
+    const { text, stop } = await callAPI([
+      { role: 'user',      content: continuation.prompt },
+      { role: 'assistant', content: continuation.accumulated },
+      { role: 'user',      content: '계속 이어서 작성해주세요. 이전 내용을 반복하지 말고, 마지막 문장 다음부터 바로 이어주세요.' },
+    ]);
+
+    if (!text || !text.trim()) throw new Error('빈 응답이 반환되었습니다. 다시 시도해주세요.');
+
+    continuation.accumulated += text;
+    wrap.innerHTML = parseAndRender(continuation.accumulated);
+
+    if (stop === 'max_tokens') {
+      const newCw = document.createElement('div');
+      newCw.className = 'continue-wrap';
+      newCw.innerHTML = `<p class="continue-note">✂ 아직 내용이 더 있습니다.</p><button class="continue-btn" onclick="continueRead()">▶ 계속 보기</button>`;
+      wrap.appendChild(newCw);
+    }
+    wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  } catch (err) {
+    // continue-wrap이 사라졌을 경우 재생성
+    cw = wrap.querySelector('.continue-wrap');
+    if (!cw) {
+      cw = document.createElement('div');
+      cw.className = 'continue-wrap';
+      wrap.appendChild(cw);
+    }
+    cw.innerHTML = `
+      <div class="err-box">⚠ 이어받기 실패: ${esc(err.message)}</div>
+      <button class="continue-btn" onclick="continueRead()" style="margin-top:10px;">↻ 다시 시도</button>`;
+  }
+}
+
+function retryReading() { startReading(); }
+
+function setResultLayout(mode) {
+  resultLayout = mode;
+  document.getElementById('layoutRowBtn').classList.toggle('active', mode === 'row');
+  document.getElementById('layoutCircleBtn').classList.toggle('active', mode === 'circle');
+  renderResultCards();
+}
+
+function getBasicReading() {
+  const pos   = getPositions();
+  const worry = document.getElementById('worryInput').value.trim();
+  const lines = picked.map(({card, reversed}, i) =>
+    `• <strong>${pos[i]?.label || ''}</strong>: ${card.name} (${reversed ? '역방향' : '정방향'})`
+  ).join('<br>');
+  return `API 키가 없어 기본 리딩을 표시합니다.<br><br>"${worry}"에 대해 선택된 카드:<br><br>${lines}<br><br>AI 리딩을 받으시려면 Claude API 키를 입력해주세요.`;
+}
+
+/* ─── 심층 분석 (추가 2장) ─── */
+function startDeepAnalysis() {
+  deepPicked = [];
+  deepDeck   = shuffle([...CARDS]);
+  document.getElementById('deepAnalysisBtn').style.display = 'none';
+
+  const area = document.getElementById('deepCardArea');
+  area.style.display = 'block';
+
+  const virtualArea = document.getElementById('deep-virtual-area');
+  const realArea    = document.getElementById('deep-real-area');
+
+  if (cardMode === 'real') {
+    virtualArea.style.setProperty('display', 'none', 'important');
+    virtualArea.style.pointerEvents = 'none';
+    realArea.style.removeProperty('display');
+    renderDeepSlots();
+    document.getElementById('deepCardSearch').value = '';
+    filterDeepCards('');
+    setTimeout(() => document.getElementById('deepCardSearch').focus(), 80);
+  } else {
+    realArea.style.setProperty('display', 'none', 'important');
+    virtualArea.style.removeProperty('display');
+    virtualArea.style.pointerEvents = '';
+    renderDeepFan();
+  }
+
+  area.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderDeepFan() {
+  const container = document.getElementById('deep-fan-container');
+  if (!container) return;
+  container.innerHTML = '';
+  const usedIds = new Set(deepPicked.map(p => p.card.id));
+
+  deepDeck.forEach((card, i) => {
+    const isUsed = usedIds.has(card.id);
+    const wrap = document.createElement('div');
+    wrap.className = 'fan-card' + (isUsed ? ' flipped picked' : '');
+    wrap.innerHTML = `
+      <div class="card-inner">
+        <div class="card-face card-back"></div>
+        <div class="card-face card-front">
+          <img src="${CDN}${card.img}" alt="${card.name}" loading="lazy"
+               onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="card-front-fallback">
+            <div class="card-front-name">${card.name}</div>
+            <div class="card-front-en">${card.en}</div>
+          </div>
+        </div>
+      </div>`;
+    if (!isUsed) wrap.addEventListener('click', () => pickDeepCard(wrap, card));
+    container.appendChild(wrap);
+  });
+}
+
+function pickDeepCard(el, card) {
+  if (el.classList.contains('picked') || deepPicked.length >= 2) return;
+  el.classList.add('flipped');
+  const reversed = dirMode === 'both' && Math.random() < 0.5;
+  setTimeout(() => {
+    el.classList.add('picked');
+    deepPicked.push({ card, reversed });
+    const left = 2 - deepPicked.length;
+    if (left > 0) {
+      document.getElementById('deepHint').textContent = `✦ ${left}장 더 골라주세요 ✦`;
+    } else {
+      document.getElementById('deepHint').textContent = `✦ 베테랑이 카드를 읽고 있습니다... ✦`;
+      setTimeout(() => finalizeDeepAnalysis(), 500);
+    }
+  }, 380);
+}
+
+async function finalizeDeepAnalysis() {
+  const deepArea = document.getElementById('deepCardArea');
+  deepArea.innerHTML = `<div class="loading-msg" style="text-align:center;padding:28px;font-size:.95rem;">✦ 심층 분석 중입니다...</div>`;
+
+  try {
+    const pos    = getPositions();
+    const worry  = document.getElementById('worryInput').value.trim();
+
+    const origLines = picked.map(({ card, reversed }, i) =>
+      `${i+1}. [${pos[i]?.label || ''}] ${card.name} (${card.en}) — ${reversed ? '역방향' : '정방향'}`
+    ).join('\n');
+
+    const deepLines = deepPicked.map(({ card, reversed }, i) =>
+      `${i+1}. [심층 카드 ${i+1}] ${card.name} (${card.en}) — ${reversed ? '역방향' : '정방향'}`
+    ).join('\n');
+
+    const prompt = `당신은 타로 카드를 깊이 이해하는 상담가입니다. 기존 ${pickCount}장 리딩에 이어 추가로 뽑은 2장의 심층 카드를 분석해주세요.
+
+**질문:** ${worry}
+
+**기존 ${pickCount}장 카드:**
+${origLines}
+
+**새로 뽑은 심층 카드 2장:**
+${deepLines}
+
+다음 형식으로 작성해주세요. 각 섹션은 반드시 【】로 시작하세요:
+
+【심층 카드 해석】
+새로 뽑은 2장의 카드를 각각 해석해주세요. 각 카드 해석 첫 줄에 핵심 키워드 해시태그 3개를 표시하고, 기존 카드의 흐름과 어떻게 연결되는지 설명해주세요.
+
+【최종 결론 & 베테랑의 조언】
+${pickCount}장과 심층 2장, 총 ${pickCount + 2}장의 에너지를 통합하여 가장 중요한 메시지와 구체적인 행동 지침을 3~4문단으로 작성해주세요.
+
+신비롭고 명확한 어조로 작성해주세요.`;
+
+    const result = await callAPI([{ role: 'user', content: prompt }]);
+    deepArea.remove();
+
+    // 결과 카드 영역에 심층 카드 추가
+    const cardsArea = document.getElementById('resultCardsArea');
+    const deepGroup = document.createElement('div');
+    deepGroup.className = 'result-group';
+    deepGroup.innerHTML = `<div class="result-group-title">✦ 심층 조언 카드</div>`;
+    const deepRow = document.createElement('div');
+    deepRow.className = 'result-cards-row';
+    deepPicked.forEach(({ card, reversed }) =>
+      deepRow.appendChild(makeResultCardItem(card, reversed, { label: '심층' }))
+    );
+    deepGroup.appendChild(deepRow);
+    cardsArea.appendChild(deepGroup);
+
+    // AI 결과에 심층 분석 추가
+    const aiWrap = document.getElementById('aiWrap');
+    const divider = document.createElement('div');
+    divider.className = 'deep-divider';
+    divider.innerHTML = `<span>✦ 베테랑의 심층 조언 ✦</span>`;
+    aiWrap.appendChild(divider);
+    const deepResult = document.createElement('div');
+    deepResult.innerHTML = parseAndRender(result.text);
+    aiWrap.appendChild(deepResult);
+
+    divider.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (err) {
+    deepArea.innerHTML = `<div class="err-box">⚠ 심층 분석 오류: ${esc(err.message)}<br><button onclick="startDeepAnalysis()">다시 시도</button></div>`;
+  }
+}
+
+/* ─── 저장 기능 ─── */
+
+// 토스트 메시지
+function showToast(msg, duration = 2400) {
+  let t = document.getElementById('saveToast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'saveToast';
+    t.style.cssText = `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);
+      background:rgba(30,14,70,.95);color:#fde87a;border:1px solid rgba(155,110,243,.5);
+      border-radius:24px;padding:10px 24px;font-size:.9rem;font-weight:600;
+      z-index:9999;pointer-events:none;transition:opacity .3s;`;
+    document.body.appendChild(t);
+  }
+  t.textContent = msg; t.style.opacity = '1';
+  clearTimeout(t._to);
+  t._to = setTimeout(() => { t.style.opacity = '0'; }, duration);
+}
+
+// 이미 로드된 <img> 요소를 canvas로 그려 dataURL 반환 (로컬 파일은 same-origin이라 가능)
+function tryImgToDataUrl(imgEl) {
+  if (!imgEl.complete || !imgEl.naturalWidth) return null;
+  try {
+    const c = document.createElement('canvas');
+    c.width = imgEl.naturalWidth;
+    c.height = imgEl.naturalHeight;
+    c.getContext('2d').drawImage(imgEl, 0, 0);
+    return c.toDataURL('image/jpeg', 0.9);
+  } catch(e) {
+    return null; // SecurityError 등 실패 시 null
+  }
+}
+
+async function captureResult() {
+  const el = document.getElementById('screen-result');
+  const restorations = [];
+
+  // 카드 이미지를 dataURL로 변환 후 교체 (html2canvas가 안정적으로 렌더링 가능)
+  const imgs = el.querySelectorAll('.result-card-img img, .card-front img');
+  imgs.forEach(img => {
+    const dataUrl = tryImgToDataUrl(img);
+    if (dataUrl) {
+      const orig = img.src;
+      img.src = dataUrl;
+      restorations.push(() => { img.src = orig; });
+    } else {
+      // dataURL 변환 실패 시 이미지 숨기고 텍스트 폴백 표시
+      const prev = img.style.display;
+      img.style.display = 'none';
+      restorations.push(() => { img.style.display = prev; });
+      const fb = img.nextElementSibling;
+      if (fb && fb.classList.contains('card-front-fallback')) {
+        const prevFb = fb.style.display;
+        fb.style.display = 'flex';
+        restorations.push(() => { fb.style.display = prevFb; });
+      }
+    }
+  });
+
+  let canvas;
+  try {
+    canvas = await html2canvas(el, {
+      backgroundColor: '#0b0820',
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      logging: false,
+      scrollX: 0,
+      scrollY: -window.scrollY,
+      windowWidth: document.documentElement.clientWidth,
+      imageTimeout: 5000,
+    });
+  } finally {
+    restorations.forEach(r => r());
+  }
+  return canvas;
+}
+
+function triggerDownload(href, filename) {
+  const a = document.createElement('a');
+  a.download = filename; a.href = href;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+async function savePDF() {
+  const btn = document.getElementById('pdfBtn');
+  const orig = btn.innerHTML;
+  btn.innerHTML = '⏳'; btn.disabled = true;
+  showToast('저장 중입니다. 잠시만 기다려주세요...');
+  try {
+    if (!window.jspdf) throw new Error('jsPDF 라이브러리 미로드 — 인터넷 연결 확인');
+    const canvas  = await captureResult();
+    const imgData = canvas.toDataURL('image/jpeg', 0.92);
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pw  = pdf.internal.pageSize.getWidth();
+    const ph  = pdf.internal.pageSize.getHeight();
+    const ih  = (canvas.height / canvas.width) * pw;
+    let offsetY = 0;
+    while (offsetY < ih) {
+      if (offsetY > 0) pdf.addPage();
+      pdf.addImage(imgData, 'JPEG', 0, -offsetY, pw, ih);
+      offsetY += ph;
+    }
+    pdf.save(`나의_타로사주_리딩_${dateStr()}.pdf`);
+    showToast('✓ PDF 저장 완료!', 2000);
+  } catch (e) { alert('PDF 오류: ' + e.message); }
+  btn.innerHTML = orig; btn.disabled = false;
+}
+
+async function saveImg() {
+  const btn = document.getElementById('imgBtn');
+  const orig = btn.innerHTML;
+  btn.innerHTML = '⏳'; btn.disabled = true;
+  showToast('저장 중입니다. 잠시만 기다려주세요...');
+  try {
+    if (!window.html2canvas) throw new Error('html2canvas 라이브러리 미로드 — 인터넷 연결 확인');
+    const canvas = await captureResult();
+    triggerDownload(canvas.toDataURL('image/png'), `나의_타로사주_리딩_${dateStr()}.png`);
+    showToast('✓ 이미지 저장 완료!', 2000);
+  } catch (e) { alert('이미지 오류: ' + e.message); }
+  btn.innerHTML = orig; btn.disabled = false;
+}
+
+function copyText() {
+  const worry = document.getElementById('resultWorry').textContent;
+  let t = `✦ ${category} 타로 리딩 결과 ✦\n${new Date().toLocaleDateString('ko-KR')}\n고민: ${worry}\n\n`;
+  t += `【선택된 카드】\n`;
+  const pos = getPositions();
+  picked.forEach(({ card, reversed }, i) => {
+    t += `${i+1}. [${pos[i]?.label || ''}] ${card.name} (${card.en}) — ${reversed ? '역방향' : '정방향'}\n`;
+  });
+  t += '\n';
+  document.querySelectorAll('#aiWrap .ai-section').forEach(b => {
+    const title = b.querySelector('.ai-section-title')?.innerText?.replace('✦ ','').trim();
+    const body  = b.querySelector('.ai-section-body')?.innerText?.trim();
+    if (title) t += `【${title}】\n${body}\n\n`;
+    else if (body) t += `${body}\n\n`;
+  });
+  // .txt 파일로 다운로드
+  const blob = new Blob([t.trim()], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.download = `나의_타로사주_리딩_${dateStr()}.txt`;
+  a.href = URL.createObjectURL(blob);
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast('✓ 텍스트 파일 저장 완료!', 2000);
+  const btn = document.getElementById('copyBtn');
+  const orig = btn.innerHTML;
+  btn.innerHTML = '✓ 저장됨!';
+  setTimeout(() => { btn.innerHTML = orig; }, 2000);
+}
+
+
+function dateStr() {
+  const d = new Date();
+  return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+}
+
+/* ─── 리셋 ─── */
+function resetAll() {
+  picked = [];
+  document.getElementById('worryInput').value = '';
+  document.getElementById('charNum').textContent = '0';
+  document.querySelectorAll('.toggle-btn,.gender-btn').forEach(b => b.classList.remove('sel'));
+  document.querySelectorAll('.card-box').forEach(b => b.classList.remove('active-box'));
+  document.getElementById('box1').classList.add('active-box');
+  dirMode = null; readingMode = isNoSaju ? 'tarot' : null;
+  cardMode = 'virtual';
+  myGender = null; partnerGender = null;
+  if (!isNoSaju && !isGungHap) {
+    document.querySelectorAll('#mode-section .toggle-btn').forEach(b => b.classList.remove('sel'));
+    document.getElementById('saju-section').style.display = 'none';
+    document.getElementById('sajuDate').value = '';
+    document.getElementById('sajuHour').value = '';
+    document.getElementById('sajuName').value = '';
+  }
+  document.getElementById('startBtn').disabled = true;
+  document.getElementById('aiWrap').innerHTML = '';
+  showScreen('screen-setup');
+}
+</script>
+</body>
+</html>
