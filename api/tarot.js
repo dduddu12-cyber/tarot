@@ -1,5 +1,5 @@
 // api/tarot.js
-// Vercel 서버리스 함수: 프론트에서 /api/tarot 로 호출하면 여기로 들어옵니다.
+// 프론트에서 /api/tarot 로 호출하면, 여기서 클로드 API를 이용해 리딩을 만들어 줍니다.
 
 export default async function handler(req, res) {
   // 1) POST 메서드만 허용
@@ -13,6 +13,15 @@ export default async function handler(req, res) {
 
     if (!question) {
       return res.status(400).json({ error: 'question(질문)이 필요합니다.' });
+    }
+
+    // 🔐 클로드 API 키 확인 (Vercel 환경 변수에서 읽음)
+    const apiKey = process.env.AI_API_KEY; // Vercel에 설정한 Key 이름과 같아야 함
+    if (!apiKey) {
+      console.error('AI_API_KEY 환경 변수가 설정되지 않았습니다.');
+      return res
+        .status(500)
+        .json({ error: '서버 설정 오류: AI_API_KEY가 없습니다.' });
     }
 
     // 3) 타로 리딩 프롬프트 만들기
@@ -37,33 +46,58 @@ ${JSON.stringify(cards || [])}
 형태로, 솔직하지만 따뜻하게 심층 리딩을 해주세요.
     `.trim();
 
-    // 4) OpenAI Responses API 호출 (API 키는 환경변수에서 읽음)
-    const openaiRes = await fetch('https://api.openai.com/v1/responses', {
+    // 4) 클로드 Messages API 호출
+    const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // 🔐 진짜 키 값은 코드에 안 쓰고, 환경변수에서만 읽습니다.
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-mini', // 필요하면 나중에 모델명 바꿀 수 있음
-        input: prompt,
+        model: 'claude-3-haiku-20240307', // 사용 중인 모델명에 맞게 변경 가능
+        max_tokens: 800,
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
       }),
     });
 
-    if (!openaiRes.ok) {
-      const errorText = await openaiRes.text();
-      console.error('OpenAI API 에러:', errorText);
-      return res.status(500).json({ error: 'AI 리딩 호출 중 오류가 발생했습니다.' });
+    if (!claudeRes.ok) {
+      const errorText = await claudeRes.text();
+      console.error('Claude API 에러:', errorText);
+      return res
+        .status(500)
+        .json({ error: 'AI 리딩 호출 중 오류가 발생했습니다.' });
     }
 
-    const data = await openaiRes.json();
-    const reading = data.output[0].content[0].text;
+    const data = await claudeRes.json();
 
-    // 5) 프론트로 리딩 결과 응답
+    // 5) 클로드 응답에서 텍스트 꺼내기
+    let reading = '';
+    if (
+      data &&
+      Array.isArray(data.content) &&
+      data.content[0] &&
+      data.content[0].type === 'text'
+    ) {
+      reading = data.content[0].text;
+    } else {
+      console.error('예상치 못한 Claude 응답 형식:', JSON.stringify(data));
+      return res
+        .status(500)
+        .json({ error: 'AI 리딩 응답 형식이 예상과 다릅니다.' });
+    }
+
+    // 6) 프론트로 리딩 결과 응답
     return res.status(200).json({ reading });
   } catch (err) {
     console.error('서버 에러:', err);
-    return res.status(500).json({ error: '서버 내부 오류가 발생했습니다.' });
+    return res
+      .status(500)
+      .json({ error: '서버 내부 오류가 발생했습니다.' });
   }
 }
