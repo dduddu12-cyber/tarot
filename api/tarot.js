@@ -17,7 +17,6 @@ export default async function handler(req, res) {
 
     // 3) 타로 리딩 프롬프트 만들기
     const prompt = `
-    const prompt = `
 당신은 노련한 타로 마스터입니다.
 
 [질문자 정보]
