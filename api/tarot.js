@@ -11,6 +11,7 @@ const redis = new Redis({
 
 const ALLOWED_ORIGINS = [
   'https://tarot-beige-mu.vercel.app',
+  'https://dduddu12-cyber.github.io',
 ];
 
 function setCors(req, res) {
